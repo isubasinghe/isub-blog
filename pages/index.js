@@ -7,6 +7,10 @@ const Home = () => (
   <div className="container">
     <Head>
       <title>Home</title>
+      <meta
+        name="description"
+        content="Isitha Subasinghe's blogging platform and portfolio. You can find about my skills, projects and blogs here."
+      />
     </Head>
     <h1>Isitha's Home Page</h1>
     <Nav />
