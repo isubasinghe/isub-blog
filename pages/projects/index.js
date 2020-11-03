@@ -49,6 +49,8 @@ const Projects = ({ links }) => {
       </Head>
       <h1>Projects</h1>
       <Nav />
+      <h2 />
+      <h3 />
       <h4>A list of projects I have worked on in my spare time</h4>
       <ul>
         {links &&

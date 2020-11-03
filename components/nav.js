@@ -40,7 +40,6 @@ const Nav = () => (
         padding: 6px 1rem;
       }
       a {
-        color: #067df7;
         font-size: 1.25rem;
       }
     `}</style>
