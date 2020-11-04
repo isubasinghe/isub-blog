@@ -3,22 +3,10 @@ import Link from "next/link";
 
 import Nav from "../../components/nav";
 
-export async function getStaticProps({}) {
-  const { resolve } = require("path");
-  const { readdir } = require("fs").promises;
+export async function getStaticProps() {
   const { readFile } = require("fs").promises;
+  const { getFiles } = require("../../helpers/file");
   const matter = require("gray-matter");
-
-  async function getFiles(dir) {
-    const dirents = await readdir(dir, { withFileTypes: true });
-    const files = await Promise.all(
-      dirents.map((dirent) => {
-        const res = resolve(dir, dirent.name);
-        return dirent.isDirectory() ? getFiles(res) : res;
-      })
-    );
-    return Array.prototype.concat(...files);
-  }
 
   let files = await getFiles("./pages/projects");
   files = files.filter((fname) => {

@@ -31,7 +31,7 @@ const Home = () => (
       knowledge.
     </p>
     <p>
-      My main interest at the moment are large scale distributed systems and
+      My main interests at the moment are large scale distributed systems and
       programming language implementation.
     </p>
 
@@ -60,6 +60,20 @@ const Home = () => (
       <li>Ada</li>
       <li>Hamler</li>
     </ul>
+    <div>
+      <hr />
+      <p className="p-header">Minimalism</p>
+      <p>
+        Apoligies if this minimalist website isn't really what you like, I am
+        capable of advanced CSS, but I really love this look.
+      </p>
+      <style jsx>{`
+        .p-header {
+          font-weight: bold;
+          text-align: center;
+        }
+      `}</style>
+    </div>
   </div>
 );
 
