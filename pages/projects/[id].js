@@ -33,6 +33,13 @@ const Project = ({ mdxSource, frontMatter }) => {
     <>
       <Head>
         <title>{frontMatter.title}</title>
+        <meta
+          name="description"
+          content={
+            frontMatter.description ??
+            `Isitha Subasinghe ${frontMatter.title} programming project`
+          }
+        />
       </Head>
       {content}
     </>

@@ -46,6 +46,10 @@ const Projects = ({ links }) => {
     <>
       <Head>
         <title>Isitha's Projects</title>
+        <meta
+          name="description"
+          content="Isitha Subasinghe's projects developed for fun and curiosity"
+        />
       </Head>
       <h1>Projects</h1>
       <Nav />
