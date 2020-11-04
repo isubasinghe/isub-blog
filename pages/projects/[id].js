@@ -42,7 +42,7 @@ const Project = ({ mdxSource, frontMatter }) => {
           }
         />
       </Head>
-      <Back />
+      <Back url="/projects" />
       {content}
     </>
   );
