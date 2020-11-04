@@ -4,17 +4,19 @@ import Link from "next/link";
 import Nav from "../../components/nav";
 
 export async function getStaticProps({}) {
-  const {resolve} = require("path");
-  const {readdir} = require("fs").promises;
-  const {readFile} = require("fs").promises;
+  const { resolve } = require("path");
+  const { readdir } = require("fs").promises;
+  const { readFile } = require("fs").promises;
   const matter = require("gray-matter");
 
   async function getFiles(dir) {
-    const dirents = await readdir(dir, {withFileTypes : true});
-    const files = await Promise.all(dirents.map((dirent) => {
-      const res = resolve(dir, dirent.name);
-      return dirent.isDirectory() ? getFiles(res) : res;
-    }));
+    const dirents = await readdir(dir, { withFileTypes: true });
+    const files = await Promise.all(
+      dirents.map((dirent) => {
+        const res = resolve(dir, dirent.name);
+        return dirent.isDirectory() ? getFiles(res) : res;
+      })
+    );
     return Array.prototype.concat(...files);
   }
 
@@ -24,20 +26,22 @@ export async function getStaticProps({}) {
     return ext === "md" || ext === "mdx";
   });
 
-  const metadata =
-      (await Promise.all(files.map(
-           (file) =>
-               readFile(file, "utf8").then((content) => matter(content).data))))
-          .filter((doc) => doc.path !== null && doc.title !== null);
+  const metadata = (
+    await Promise.all(
+      files.map((file) =>
+        readFile(file, "utf8").then((content) => matter(content).data)
+      )
+    )
+  ).filter((doc) => doc.path !== null && doc.title !== null);
 
   return {
-    props : {
-      links : metadata,
+    props: {
+      links: metadata,
     },
   };
 }
 
-const Projects = ({links}) => {
+const Projects = ({ links }) => {
   return (
     <>
       <Head>
