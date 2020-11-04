@@ -1,5 +1,5 @@
-import Head from "next/head";
 import hydrate from "next-mdx-remote/hydrate";
+import Head from "next/head";
 
 export async function getStaticProps({ params }) {
   const matter = require("gray-matter");
@@ -33,6 +33,13 @@ const Project = ({ mdxSource, frontMatter }) => {
     <>
       <Head>
         <title>{frontMatter.title}</title>
+        <meta
+          name="description"
+          content={
+            frontMatter.description ??
+            `Isitha Subasinghe ${frontMatter.title} programming project`
+          }
+        />
       </Head>
       {content}
     </>
