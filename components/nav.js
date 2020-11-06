@@ -19,6 +19,9 @@ const Nav = () => (
           <a>Blogs</a>
         </Link>
       </li>
+      <li>
+        <a href="https://wiki.isub.dev">Wiki</a>
+      </li>
     </ul>
     <style jsx>{`
       nav {

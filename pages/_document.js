@@ -9,7 +9,9 @@ class CustomDocument extends Document {
   render() {
     return (
       <Html lang="en">
-        <Head />
+        <Head>
+          <link rel="dns-prefetch" href="https://wiki.isub.dev" />
+        </Head>
         <body>
           <Main />
           <NextScript />
