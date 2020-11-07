@@ -1,10 +1,32 @@
-const { resolve } = require("path");
+const { resolve, sep } = require("path");
 const { readdir, readFile } = require("fs").promises;
 const matter = require("gray-matter");
+const TrieMap = require("mnemonist/trie-map");
 
-const cache = {};
+const trieCache = new TrieMap();
 
-async function getFiles(dir, ext = null) {
+const currCWD = process.cwd().split(sep);
+
+function relativeNodes(file) {
+  const nodes = file.split(sep);
+  const relativeNodes = [];
+
+  let i = 0;
+  for (; i < nodes.length; i = i + 1) {
+    if (nodes[i] !== currCWD[i]) {
+      break;
+    }
+  }
+
+  const startIndex = i;
+  for (let i = startIndex; i < nodes.length; i = i + 1) {
+    relativeNodes.push(nodes[i]);
+  }
+
+  return relativeNodes;
+}
+
+async function getFiles(dir) {
   const dirents = await readdir(dir, { withFileTypes: true });
   const files = await Promise.all(
     dirents.map((dirent) => {
@@ -16,15 +38,19 @@ async function getFiles(dir, ext = null) {
 }
 
 async function getContentData(file) {
-  if (file in cache) {
-    return cache[file];
+  const location = relativeNodes(file);
+
+  const res = trieCache.get(location);
+  if (res !== undefined) {
+    return res;
   }
 
   const fileData = await readFile(file, "utf-8");
 
   const { content, data } = matter(fileData);
   const matterData = { content, data };
-  cache[file] = matterData;
+
+  trieCache.set(location, matterData);
   return matterData;
 }
 
