@@ -7,3 +7,7 @@ a {
   color: #1768ac;
   font-size: 1.25rem;
 }
+
+.mspace.newline {
+  margin-top: 1.5rem;
+}

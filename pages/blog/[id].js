@@ -15,7 +15,11 @@ const Highlight = ({
   newProps.theme = github;
 
   if (language === "latex") {
-    return <TeX block>{children}</TeX>;
+    return (
+      <>
+        <TeX block>{children}</TeX>
+      </>
+    );
   }
   return (
     <HighlightPrism {...newProps} code={children} language={language}>
@@ -44,7 +48,7 @@ export async function getStaticProps({ params }) {
   const renderToString = require("next-mdx-remote/render-to-string");
 
   const { content, data } = matter(
-    await readFile(`./pages/projects/${params.id}.md`, "utf8")
+    await readFile(`./pages/blog/${params.id}.md`, "utf8")
   );
 
   const mdxSource = await renderToString(content, {
@@ -63,12 +67,12 @@ export async function getStaticProps({ params }) {
 
 export async function getStaticPaths() {
   return {
-    paths: ["/projects/inverted-index"],
+    paths: ["/blog/e-pi-i"],
     fallback: false,
   };
 }
 
-const Project = ({ mdxSource, frontMatter }) => {
+const BlogPost = ({ mdxSource, frontMatter }) => {
   const content = hydrate(mdxSource, {
     components: {
       pre: Highlight,
@@ -86,10 +90,10 @@ const Project = ({ mdxSource, frontMatter }) => {
           }
         />
       </Head>
-      <Back url="/projects" />
+      <Back url="/blog" />
       {content}
     </>
   );
 };
 
-export default Project;
+export default BlogPost;
