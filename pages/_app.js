@@ -1,6 +1,5 @@
 import "../styles.css";
-import Nav from "../components/nav";
-
+import "katex/dist/katex.min.css";
 export default function MyApp({ Component, pageProps }) {
   return (
     <div className="container">
