@@ -1,5 +1,5 @@
-const {resolve, sep} = require("path");
-const {readdir, readFile} = require("fs").promises;
+const { resolve, sep } = require("path");
+const { readdir, readFile } = require("fs").promises;
 const matter = require("gray-matter");
 const TrieMap = require("mnemonist/trie-map");
 
@@ -27,11 +27,13 @@ function relativeNodes(file) {
 }
 
 async function getFiles(dir) {
-  const dirents = await readdir(dir, {withFileTypes : true});
-  const files = await Promise.all(dirents.map((dirent) => {
-    const res = resolve(dir, dirent.name);
-    return dirent.isDirectory() ? getFiles(res) : res;
-  }));
+  const dirents = await readdir(dir, { withFileTypes: true });
+  const files = await Promise.all(
+    dirents.map((dirent) => {
+      const res = resolve(dir, dirent.name);
+      return dirent.isDirectory() ? getFiles(res) : res;
+    })
+  );
   return Array.prototype.concat(...files);
 }
 
@@ -45,20 +47,20 @@ async function getContentData(file) {
 
   const fileData = await readFile(file, "utf-8");
 
-  const {content, data} = matter(fileData);
-  const matterData = {content, data};
+  const { content, data } = matter(fileData);
+  const matterData = { content, data };
 
   trieCache.set(location, matterData);
   return matterData;
 }
 
 async function getMetadata(file) {
-  const {data} = await getContentData(file);
+  const { data } = await getContentData(file);
   return data;
 }
 
 module.exports = {
   getFiles,
   getContentData,
-  getMetadata
+  getMetadata,
 };
