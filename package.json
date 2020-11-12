@@ -12,10 +12,13 @@
     "gray-matter": "^4.0.2",
     "katex": "^0.12.0",
     "mnemonist": "^0.38.0",
-    "next": "10.0.0",
+    "next": "^10.0.1",
     "next-mdx-remote": "^1.0.0",
+    "next-plugin-preact": "^3.0.3",
+    "preact": "^10.5.5",
+    "preact-render-to-string": "^5.1.11",
     "prism-react-renderer": "^1.1.1",
-    "react": "17.0.1",
-    "react-dom": "17.0.1"
+    "react": "npm:@preact/compat",
+    "react-dom": "npm:@preact/compat"
   }
 }
