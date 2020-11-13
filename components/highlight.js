@@ -22,7 +22,6 @@ const Highlight = ({
   return language === "latex" ? (
     <>
       <div dangerouslySetInnerHTML={{ __html: katexCode }} />
-      <style jsx>{``}</style>
     </>
   ) : (
     <HighlightPrism {...newProps} code={children} language={language}>
