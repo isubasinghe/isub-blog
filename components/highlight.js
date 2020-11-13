@@ -1,6 +1,8 @@
+import { useRef } from "react";
 import TeX from "@matejmazur/react-katex";
 import HighlightPrism, { defaultProps } from "prism-react-renderer";
 import github from "prism-react-renderer/themes/github";
+const katex = require("katex");
 
 const Highlight = ({
   children: {
@@ -9,10 +11,22 @@ const Highlight = ({
 }) => {
   const language = parentClassName.replace(/language-/, "") || "";
   const newProps = defaultProps;
+  const ref = useRef();
   newProps.theme = github;
 
+  let katexCode = "";
+  if (language === "latex") {
+    katexCode = katex.renderToString(children, {
+      throwOnError: false,
+      displayMode: true,
+    });
+  }
+
   return language === "latex" ? (
-    <TeX block>{children}</TeX>
+    <>
+      <div dangerouslySetInnerHTML={{ __html: katexCode }} />
+      <style jsx>{``}</style>
+    </>
   ) : (
     <HighlightPrism {...newProps} code={children} language={language}>
       {({ className, style, tokens, getLineProps, getTokenProps }) => (
