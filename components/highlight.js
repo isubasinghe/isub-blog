@@ -1,5 +1,3 @@
-import { useRef } from "react";
-import TeX from "@matejmazur/react-katex";
 import HighlightPrism, { defaultProps } from "prism-react-renderer";
 import github from "prism-react-renderer/themes/github";
 const katex = require("katex");
@@ -11,7 +9,6 @@ const Highlight = ({
 }) => {
   const language = parentClassName.replace(/language-/, "") || "";
   const newProps = defaultProps;
-  const ref = useRef();
   newProps.theme = github;
 
   let katexCode = "";
