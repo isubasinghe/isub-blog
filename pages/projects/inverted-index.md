@@ -30,3 +30,34 @@ Obviously generating all words with edit distance `n` is not a viable solution.
 
 <hr />
 I'm looking forward to getting stuck into this project after exams are over.
+
+<hr />
+**UPDATE: 2/12/2020**
+
+
+I have started rewriting the search engine in Rust. 
+So far I have added quite a lot more functionality when compared to the C++ implementation. 
+
+* Supports prefix encoding along with suffix encoding thanks to the finite state transducer library by BurntSushi
+* Supports persisted data, using spacejam's sled database
+* Support for inserts while in operation at a low cost
+* Support for re-indexing while in operation
+* Support stemming for 17 languages
+* Supports unicode text tokenisation
+* Supports BM25 for scoring
+* Supports a Web API
+* Supports (soon) gRPC
+* Coming soon: faceting
+* Coming eventually (hopefully) Clustering, Concensus, etc. for a distributed search engine
+
+
+<p>
+The system is extremely fast at writes according to my benchmarks.It doesn't favour concurrency however, 
+I will most likely expose a channel that the Inverted Index can read write jobs from. I think this 
+will reduce thread contention and improve performance by a significant margin. 
+
+I was able to achieve on average 15ms for an insertion of 148KB. 
+Including all deserialization and serialization costs, the average insertion jumped to about 50ms for this document. 
+The most important criteria was thread contention, when concurrency increased the time increased significantly. 
+
+</p>
