@@ -20,6 +20,11 @@ const Nav = () => (
         </Link>
       </li>
       <li>
+        <Link href="/books">
+          <a>Books</a>
+        </Link>
+      </li>
+      <li>
         <a href="https://wiki.isub.dev">Wiki</a>
       </li>
     </ul>
