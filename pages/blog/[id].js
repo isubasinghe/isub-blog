@@ -1,6 +1,7 @@
 import hydrate from "next-mdx-remote/hydrate";
 import Head from "next/head";
 import Highlight from "../../components/highlight";
+import Interpreter from "../../components/interpreter";
 import Back from "../../components/back";
 
 export async function getStaticProps({ params }) {
@@ -15,6 +16,8 @@ export async function getStaticProps({ params }) {
   const mdxSource = await renderToString(content, {
     components: {
       pre: Highlight,
+      Interpreter,
+      Head,
     },
   });
 
@@ -28,7 +31,7 @@ export async function getStaticProps({ params }) {
 
 export async function getStaticPaths() {
   return {
-    paths: ["/blog/e-pi-i"],
+    paths: ["/blog/e-pi-i", "/blog/interpreter"],
     fallback: false,
   };
 }
@@ -37,6 +40,8 @@ const BlogPost = ({ mdxSource, frontMatter }) => {
   const content = hydrate(mdxSource, {
     components: {
       pre: Highlight,
+      Interpreter,
+      Head,
     },
   });
   return (
@@ -50,6 +55,7 @@ const BlogPost = ({ mdxSource, frontMatter }) => {
             `Isitha Subasinghe ${frontMatter.title} programming project`
           }
         />
+        <script src="/ischeme-wasm.js"></script>
       </Head>
       <Back url="/blog" />
       {content}
