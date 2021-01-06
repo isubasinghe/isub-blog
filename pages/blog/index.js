@@ -51,6 +51,12 @@ const Blog = ({ links }) => {
                   a {
                     font-size: 1rem;
                   }
+                  li {
+                    font-size: 1rem;
+                  }
+                  li:not(:last-child) {
+                    margin-bottom: 1rem;
+                  }
                 `}</style>
               </li>
             );

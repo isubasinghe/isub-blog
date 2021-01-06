@@ -19,6 +19,9 @@ const Interpreter = ({}) => {
   return (
     <>
       <textarea value={input} onChange={handleInput}/>
+      <p />
+      <textarea className="output-area" value={output} readOnly />
+
       <style>{
         `
         textarea {
@@ -26,11 +29,15 @@ const Interpreter = ({}) => {
           width: 750px;
           height: 200px;
         }
+        .output-area {
+          border: none;
+          resize: none;
+        }
+        .output-area:focus {
+          outline: none;
+        }
         `
         }</style>
-      <p>
-        {output}
-      </p>
       
     </>
   );
