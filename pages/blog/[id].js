@@ -59,6 +59,13 @@ const BlogPost = ({ mdxSource, frontMatter }) => {
       </Head>
       <Back url="/blog" />
       {content}
+      <style>{
+        `
+        a {
+          font-size: 1rem;
+        }
+        `  
+      }</style>
     </>
   );
 };
