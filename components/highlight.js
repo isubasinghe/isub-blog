@@ -1,6 +1,10 @@
 import HighlightPrism, { defaultProps } from "prism-react-renderer";
+import Prism from "prism-react-renderer/prism";
 import github from "prism-react-renderer/themes/github";
 const katex = require("katex");
+
+(typeof global !== "undefined" ? global : window).Prism = Prism;
+require("prismjs/components/prism-scheme");
 
 const Highlight = ({
   children: {

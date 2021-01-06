@@ -6,6 +6,11 @@ date: null
 ---
 ## A simple scheme interpreter in Haskell
 
-### Try it out below (its sort of incomplete atm)
+### Try it out below (its sort of incomplete at the moment however)
+Try out 
+```scheme
+(define (factorial x) (if (= x 1) 1 (* x (factorial (- x 1)))))
+(factorial 10)
+```
 <Interpreter>
 </Interpreter>

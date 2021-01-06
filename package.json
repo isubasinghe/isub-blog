@@ -18,6 +18,7 @@
     "preact": "^10.5.5",
     "preact-render-to-string": "^5.1.11",
     "prism-react-renderer": "^1.1.1",
+    "prismjs": "^1.23.0",
     "react": "npm:@preact/compat",
     "react-dom": "npm:@preact/compat"
   }
