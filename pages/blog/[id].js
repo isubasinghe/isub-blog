@@ -31,7 +31,11 @@ export async function getStaticProps({ params }) {
 
 export async function getStaticPaths() {
   return {
-    paths: ["/blog/e-pi-i", "/blog/interpreter"],
+    paths: [
+      "/blog/e-pi-i", 
+      "/blog/interpreter",
+      // "/blog/writing-a-search-engine-p1"
+    ],
     fallback: false,
   };
 }
