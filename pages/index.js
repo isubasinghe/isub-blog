@@ -21,20 +21,17 @@ const Home = () => (
       since I was in primary school.
     </p>
     <p>
-      I started with Pascal and have dealt with 14 languages at the time of
-      writing this. I am driven by the desire to learn concepts not frameworks.
-    </p>
-    <p>
-      I have knowledge in LLVM IR, Compilers, Search Engine implementation,
-      frontend web development, backend web development, I have even written my
-      own FreeBSD kernel modules. My hope is to continue to adding to this
-      knowledge.
+      I have knowledge in a wide variety of computer science topics, my aim is to keep adding 
+      to this knowledge.
     </p>
     <p>
       My main interests at the moment are large scale distributed systems and
       programming language implementation.
     </p>
-
+    <p>
+      Most of the code I hack around with is open source, 
+      you can have a look <a style={{fontSize:"16px"}} href="https://github.com/isubasinghe">here</a>
+    </p>
     <h3>Programming Languages</h3>
     <ul>
       <li>C++</li>
@@ -43,37 +40,11 @@ const Home = () => (
       <li>Python</li>
       <li>Go</li>
       <li>Java</li>
-      <li>C#</li>
+      <li>Rust</li>
       <li>JavaScript</li>
       <li>TypeScript</li>
-      <li>Lua (Past)</li>
-      <li>Matlab (Past)</li>
       <li>x86-64 (To a certain extent) </li>
     </ul>
-    <h3>Planning to learn</h3>
-    <ul>
-      <li>Racket</li>
-      <li>Idris</li>
-      <li>Erlang</li>
-      <li>Prolog</li>
-      <li>Rust</li>
-      <li>Ada</li>
-      <li>Hamler</li>
-    </ul>
-    <div>
-      <hr />
-      <p className="p-header">Minimalism</p>
-      <p>
-        Apoligies if this minimalist website isn't really what you like, I am
-        capable of advanced CSS, but I really love this look.
-      </p>
-      <style jsx>{`
-        .p-header {
-          font-weight: bold;
-          text-align: center;
-        }
-      `}</style>
-    </div>
   </div>
 );
 
