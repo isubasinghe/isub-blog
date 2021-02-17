@@ -34,6 +34,7 @@ export async function getStaticPaths() {
     paths: [
       "/blog/e-pi-i", 
       "/blog/interpreter",
+      "/blog/either-monad-rust",
       // "/blog/writing-a-search-engine-p1"
     ],
     fallback: false,

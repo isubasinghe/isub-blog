@@ -5,7 +5,7 @@ const katex = require("katex");
 
 (typeof global !== "undefined" ? global : window).Prism = Prism;
 require("prismjs/components/prism-scheme");
-
+require("prismjs/components/prism-rust");
 const Highlight = ({
   children: {
     props: { className: parentClassName, children },
