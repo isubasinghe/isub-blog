@@ -30,7 +30,7 @@ const Highlight = ({
   ) : (
     <HighlightPrism {...newProps} code={children} language={language}>
       {({ className, style, tokens, getLineProps, getTokenProps }) => (
-        <pre className={className} style={{ ...style }}>
+        <pre className={className} style={{ ...style, overflow: "auto" }}>
           {tokens.map((line, index) => {
             const lineProps = getLineProps({ line, key: index });
             return (
