@@ -23,6 +23,7 @@
     "react": "npm:@preact/compat",
     "react-digraph": "^7.2.1",
     "react-dom": "npm:@preact/compat",
+    "react-use": "^17.1.1",
     "xactor": "^0.3.1"
   },
   "devDependencies": {
