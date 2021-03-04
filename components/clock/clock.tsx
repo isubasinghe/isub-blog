@@ -1,9 +1,17 @@
-import React, { useContext, useState, useLayoutEffect } from "react";
+import React, { useContext, useState, useLayoutEffect, useRef } from "react";
 import {useInterval} from 'react-use';
 import { ClocksContext } from "./store";
 
+function randomIntFromInterval(min, max) { // min and max included 
+    return Math.floor(Math.random() * (max - min + 1) + min);
+}
 
 const Clock = ({id, colour}: {id: number, colour: string}) => {
+    let ref = useRef<null|number>();
+    if(ref.current === undefined) {
+        ref.current = randomIntFromInterval(500, 1200);
+
+    }
     const {state, dispatch } = useContext(ClocksContext);
     const [counter, setCounter] = useState(0);
     const [deltaLocal, setDeltaLocal] = useState(0);
@@ -19,7 +27,7 @@ const Clock = ({id, colour}: {id: number, colour: string}) => {
 
     useInterval(() => {
         setCounter((count) => count + 1);
-    }, 1000);
+    }, ref.current);
 
     useLayoutEffect(() => {
         dispatch({type: "UPDATE_DELTA", id, delta: 0});
