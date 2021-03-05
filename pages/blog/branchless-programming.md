@@ -20,7 +20,7 @@ all the work done is discarded, this is obvisouly bad for performance, since we 
 
 Have a look <a href="https://stackoverflow.com/questions/9820319/why-is-a-cpu-branch-instruction-slow" target="_blank" rel=""> here</a> for more information.
 
-If we directly map if statements to assembly, we see `jmp` statements. Here is a small example.
+If we directly map if statements to assembly, we see `jmp` statements, it isn't just if statements that cause `jmp` statements to be used, but they are the most frequent. Here is a small example.
 
 **Note**: Instead of mapping into `x86`, I decided to make up a tiny instruction set as I think this should make it more obvious.
 
