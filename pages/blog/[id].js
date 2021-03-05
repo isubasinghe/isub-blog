@@ -5,51 +5,56 @@ import Back from "../../components/back";
 import Highlight from "../../components/highlight";
 import Interpreter from "../../components/interpreter";
 
-export async function getStaticProps({params}) {
+export async function getStaticProps({ params }) {
   const matter = require("gray-matter");
-  const {readFile} = require("fs").promises;
+  const { readFile } = require("fs").promises;
   const renderToString = require("next-mdx-remote/render-to-string");
 
-  const {content, data} =
-      matter(await readFile(`./pages/blog/${params.id}.md`, "utf8"));
+  const { content, data } = matter(
+    await readFile(`./pages/blog/${params.id}.md`, "utf8")
+  );
 
   const mdxSource = await renderToString(content, {
-    components : {
-      pre : Highlight,
+    components: {
+      pre: Highlight,
       Interpreter,
       Head,
     },
   });
 
   return {
-    props : {
+    props: {
       mdxSource,
-      frontMatter : data,
+      frontMatter: data,
     },
   };
 }
 
 export async function getStaticPaths() {
   return {
-    paths : [
-      "/blog/e-pi-i", "/blog/interpreter", "/blog/either-monad-rust",
-      "/blog/branchless-programming"
+    paths: [
+      "/blog/e-pi-i",
+      "/blog/interpreter",
+      "/blog/either-monad-rust",
+      "/blog/branchless-programming",
       // "/blog/writing-a-search-engine-p1"
     ],
-    fallback : false,
+    fallback: false,
   };
 }
 
-const BlogPost = ({mdxSource, frontMatter}) => {
+const BlogPost = ({ mdxSource, frontMatter }) => {
   const content = hydrate(mdxSource, {
-    components : {
-      pre : Highlight,
+    components: {
+      pre: Highlight,
       Interpreter,
       Head,
     },
   });
-  return (<><Head><title>{frontMatter.title}<
-          /title>
+  return (
+    <>
+      <Head>
+        <title>{frontMatter.title}</title>
         <meta
           name="description"
           content={
@@ -57,14 +62,17 @@ const BlogPost = ({mdxSource, frontMatter}) => {
             `Isitha Subasinghe ${frontMatter.title} programming project`
           }
         />
-          <script src = "/ischeme-wasm.js"></script>
+        <script src="/ischeme-wasm.js"></script>
       </Head>
-          <Back url = "/blog" />{content}<style>{`
+      <Back url="/blog" />
+      {content}
+      <style>{`
         a {
           font-size: 1rem;
         }
         `}</style>
-    </>);
+    </>
+  );
 };
 
 export default BlogPost;
