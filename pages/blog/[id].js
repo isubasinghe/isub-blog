@@ -35,6 +35,7 @@ export async function getStaticPaths() {
       "/blog/e-pi-i", 
       "/blog/interpreter",
       "/blog/either-monad-rust",
+      "/blog/branchless-programming"
       // "/blog/writing-a-search-engine-p1"
     ],
     fallback: false,
