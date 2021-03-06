@@ -2,7 +2,7 @@
 import produce from "immer"
 import { initialStateType } from "./store";
 
-export type Actions 
+export type Actions
     = {type: "UPDATE_DELTA", id: number, delta: number}
     | { type: "RESET_DELTA", id: number};
 

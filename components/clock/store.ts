@@ -12,4 +12,3 @@ export const ClocksContext = createContext<{
     state: initialStateType,
     dispatch: React.Dispatch<Actions>
 }>({state: initialState, dispatch: () => {}});
-
