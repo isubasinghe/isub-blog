@@ -2,7 +2,7 @@ import React, { useContext, useState, useLayoutEffect, useRef } from "react";
 import {useInterval} from 'react-use';
 import { ClocksContext } from "./store";
 
-function randomIntFromInterval(min, max) { // min and max included 
+function randomIntFromInterval(min, max) { // min and max included
     return Math.floor(Math.random() * (max - min + 1) + min);
 }
 
@@ -56,7 +56,7 @@ const Clock = ({id, colour}: {id: number, colour: string}) => {
                 .delta_local {
                     margin-left: 20px;
                 }
-            `}</style>  
+            `}</style>
             <div className="circle_container">
                 <div className={`circle_${colour}`}>{counter}</div>
                 {deltaLocal !== 0 && <div className="delta_local">{showText}</div>}

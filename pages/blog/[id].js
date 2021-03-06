@@ -1,8 +1,9 @@
 import hydrate from "next-mdx-remote/hydrate";
 import Head from "next/head";
+
+import Back from "../../components/back";
 import Highlight from "../../components/highlight";
 import Interpreter from "../../components/interpreter";
-import Back from "../../components/back";
 
 export async function getStaticProps({ params }) {
   const matter = require("gray-matter");
@@ -32,10 +33,10 @@ export async function getStaticProps({ params }) {
 export async function getStaticPaths() {
   return {
     paths: [
-      "/blog/e-pi-i", 
+      "/blog/e-pi-i",
       "/blog/interpreter",
       "/blog/either-monad-rust",
-      "/blog/branchless-programming"
+      "/blog/branchless-programming",
       // "/blog/writing-a-search-engine-p1"
     ],
     fallback: false,
@@ -65,13 +66,11 @@ const BlogPost = ({ mdxSource, frontMatter }) => {
       </Head>
       <Back url="/blog" />
       {content}
-      <style>{
-        `
+      <style>{`
         a {
           font-size: 1rem;
         }
-        `  
-      }</style>
+        `}</style>
     </>
   );
 };

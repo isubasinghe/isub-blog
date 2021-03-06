@@ -8,7 +8,7 @@ const BerkeleyClockSync = dynamic(
 
 
 const Test = () => {
-    
+
     return (
         <>
             <BerkeleyClockSync />
