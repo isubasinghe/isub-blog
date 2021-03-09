@@ -86,7 +86,7 @@ branchless programming would likely be criticial there.
 
 ### A tiny (inefficient) example
 
-I can't come of a better example than what whatsacreel (linked below) has. I
+I can't think of a better example than what whatsacreel (linked below) has. I
 think that example is small and shows branchless programming minimalistically.
 
 #### Branched version
