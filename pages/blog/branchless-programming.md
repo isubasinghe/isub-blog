@@ -105,8 +105,7 @@ int min(int a, int b) {
 }
 ```
 
-**Note:** More examples are available
-<a target="_blank" rel="noreferrer noopener" href="https://hbfs.wordpress.com/2008/08/05/branchless-equivalents-of-simple-functions/">here.</a>
+**Note:** More examples are available <a target="_blank" rel="noreferrer noopener" href="https://hbfs.wordpress.com/2008/08/05/branchless-equivalents-of-simple-functions/">here.</a>
 
 ### Resources
 
