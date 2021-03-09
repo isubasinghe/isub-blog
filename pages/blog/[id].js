@@ -65,6 +65,19 @@ const BlogPost = ({ mdxSource, frontMatter }) => {
         <script src="/ischeme-wasm.js"></script>
       </Head>
       <Back url="/blog" />
+      {frontMatter.date && 
+        <>
+          <style>{
+            `.date {
+              margin-top: 20px;
+              text-decoration: underline;
+              display: flex;
+              justify-content: flex-end;
+            }`
+            }</style>
+          <div className="date">Published Date: {frontMatter.date}</div>
+        </>
+      }
       {content}
       <style>{`
         a {

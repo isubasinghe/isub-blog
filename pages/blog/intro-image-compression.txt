@@ -1,0 +1,6 @@
+---
+title: Introduction to image compression: Fourier Transforms
+path: intro-image-compression
+description: A light introduction to image compression
+date: 2021-3-9
+---
