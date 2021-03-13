@@ -10,10 +10,14 @@ const Gossip = dynamic(() => import("../components/gossip"), {
   loading: () => <p>...</p>,
 });
 
+const VClockMan = dynamic(() => import("../components/vclock"), {
+  loading: () => <p>...</p>,
+});
+
 const Test = () => {
   return (
     <>
-      <Gossip />
+      <VClockMan />
     </>
   );
 };
