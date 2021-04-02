@@ -1,4 +1,4 @@
-import HighlightPrism, { defaultProps } from "prism-react-renderer";
+import HighlightPrism, {defaultProps} from "prism-react-renderer";
 import Prism from "prism-react-renderer/prism";
 import github from "prism-react-renderer/themes/github";
 const katex = require("katex");
@@ -7,8 +7,8 @@ const katex = require("katex");
 require("prismjs/components/prism-scheme");
 require("prismjs/components/prism-rust");
 const Highlight = ({
-  children: {
-    props: { className: parentClassName, children },
+  children : {
+    props : {className : parentClassName, children},
   },
 }) => {
   const language = parentClassName.replace(/language-/, "") || "";
