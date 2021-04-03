@@ -26,7 +26,7 @@ namely branch predictors but if the prediction is wrong all the work done is
 discarded, this is obvisouly bad for performance, since we need to start over
 again.
 
-Have a look <a href="https://stackoverflow.com/questions/9820319/why-is-a-cpu-branch-instruction-slow" target="_blank" rel="">here</a> for more information.
+Have a look <a href="https://stackoverflow.com/questions/9820319/why-is-a-cpu-branch-instruction-slow" target="_blank" rel="noreferrer noopener">here</a> for more information.
 
 If we directly map if statements to assembly, we see `jmp` statements, it isn't
 just if statements that cause `jmp` statements to be used, but they are the most
