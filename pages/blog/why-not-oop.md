@@ -33,9 +33,7 @@ around dataflow.
 
 Object Oriented Programming revolves around how to structure entities. functions
 that change these entities are bundled together with the entity but they really
-are
-<a href="https://steve-yegge.blogspot.com/2006/03/execution-in-kingdom-of-nouns.html" target="_blank" rel="noreferrer noopener">second
-class citizens.</a>
+are <a href="https://steve-yegge.blogspot.com/2006/03/execution-in-kingdom-of-nouns.html" target="_blank" rel="noreferrer noopener">second class citizens.</a>
 
 But the important thing to note here is that how you structure **entities**
 **isn't** really **the hardest problem** in programming, in fact in my
@@ -135,8 +133,7 @@ Rust is one language that solved the problem C/C++ has through an advanced type
 system, I genuinely think that an advanced type system could also solve the
 issues that I have outlined above.
 
-I really like
-<a href="https://adam.nels.onl/blog/an-oo-languge-for-the-20s/" target="_blank" rel="noreferrer noopener">this</a>.
+I really like <a href="https://adam.nels.onl/blog/an-oo-languge-for-the-20s/" target="_blank" rel="noreferrer noopener">this</a>.
 What Adam argues for makes sense, I do really love some of his points. I think
 for me the most important features are:
 
