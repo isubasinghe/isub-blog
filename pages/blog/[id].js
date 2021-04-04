@@ -1,6 +1,6 @@
 import hydrate from "next-mdx-remote/hydrate";
 import Head from "next/head";
-
+import { Themed } from "theme-ui";
 import Back from "../../components/back";
 import Highlight from "../../components/highlight";
 import Interpreter from "../../components/interpreter";
@@ -81,7 +81,7 @@ const BlogPost = ({ mdxSource, frontMatter }) => {
               justify-content: flex-end;
             }`
             }</style>
-          <div className="date">Published Date: {frontMatter.date}</div>
+          <Themed.div className="date">Published Date: {frontMatter.date}</Themed.div>
         </>
       }
       {content}
