@@ -1,3 +1,5 @@
+#!/usr/bin/env stack
+
 import           Data.List
 import           Data.Time.Calendar
 import           Data.Time.Clock
