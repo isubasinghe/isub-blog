@@ -1,3 +1,4 @@
+#!/usr/bin/env stack
 import           Data.List
 import           Data.Time.Calendar
 import           Data.Time.Clock
@@ -56,7 +57,7 @@ main = do
     putStrLn "Enter description: "
     description <- getLine
     post <- createNewPost title path description
-    handle <- openFile (printf "%s.md" path) WriteMode
+    handle <- openFile (printf "./pages/blog/%s.md" path) WriteMode
     hPrint handle post
     hClose handle
     return ()
