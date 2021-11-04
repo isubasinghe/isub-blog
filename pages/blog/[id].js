@@ -1,30 +1,26 @@
-import hydrate from "next-mdx-remote/hydrate";
+import { serialize } from 'next-mdx-remote/serialize';
+import { MDXRemote } from 'next-mdx-remote';
 import Head from "next/head";
 
 import Back from "../../components/back";
 import Highlight from "../../components/highlight";
 import Interpreter from "../../components/interpreter";
 import { getFiles } from "../../helpers/file"; 
+
+const components = { pre: Highlight, Interpreter, Head };
+
 export async function getStaticProps({ params }) {
   const matter = require("gray-matter");
   const { readFile } = require("fs").promises;
-  const renderToString = require("next-mdx-remote/render-to-string");
-
   const { content, data } = matter(
     await readFile(`./pages/blog/${params.id}.md`, "utf8")
   );
 
-  const mdxSource = await renderToString(content, {
-    components: {
-      pre: Highlight,
-      Interpreter,
-      Head,
-    },
-  });
+  const mdxSource = await serialize(content);
 
   return {
     props: {
-      mdxSource,
+      source: mdxSource,
       frontMatter: data,
     },
   };
@@ -49,14 +45,7 @@ export async function getStaticPaths() {
     fallback: false,
   };
 }
-const BlogPost = ({ mdxSource, frontMatter }) => {
-  const content = hydrate(mdxSource, {
-    components: {
-      pre: Highlight,
-      Interpreter,
-      Head,
-    },
-  });
+const BlogPost = ({ source, frontMatter }) => {
   return (
     <>
       <Head>
@@ -84,7 +73,7 @@ const BlogPost = ({ mdxSource, frontMatter }) => {
           <div className="date">Published Date: {frontMatter.date}</div>
         </>
       }
-      {content}
+      <MDXRemote {...source} components={components} />
       <style>{`
         a {
           font-size: 1rem;
