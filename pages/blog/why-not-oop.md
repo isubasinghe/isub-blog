@@ -5,6 +5,11 @@ description: Why OOP has a lot of problems
 date: 2021-4-3
 ---
 
+## TL;DR 
+Languages like Java/C# leave little for the compiler to prove regarding the "well-definedness" of a program, this in term leaves 
+the programmer to dynamically verify more properties of their code, I would also like to argue that current OOP languages worsen the challenges of this task by the programmer. 
+OOP doesn't necessarily have to be bad, I think that these issues can be fixed by a more restricitve type system.
+
 ## Why not OOP?
 
 I understand that this a very controversial opinion but hear me out, maybe I am
@@ -18,6 +23,7 @@ about the popular implementations of OOP like Java/C# and not Smalltalk.
 Another note: I may be wrong about C#, I have made an assumption here that it is
 essentially Java with nicer syntax, based upon the comments I have heard from
 developers.
+
 
 ### What is dataflow?
 
@@ -60,50 +66,6 @@ excellent solutions to concurrent state modification. Once again this can be
 blamed on the programmer, but a good paradigm should stop yourself from shooting
 yourself in the foot.
 
-**Side Note:** Here here is a small example of STM in Haskell (taken from
-Snoyman's workshop), it blew my mind how easy it was to write concurrent code in
-Haskell.
-
-```haskell
-import Control.Concurrent (threadDelay)
-import Control.Concurrent.Async
-import Control.Concurrent.STM
-import Control.Monad (forever)
-
-payAlice :: TVar Int -> IO ()
-payAlice aliceVar = forever $ do
-  stmVal <- atomically $ do
-    aliceOrig <- readTVar aliceVar
-    writeTVar aliceVar $! aliceOrig + 5
-  threadDelay 100000 -- 100ms, threadDelay takes nanoseconds
-
--- | Transfer 40 from Alice to Bob.
-transfer
-  :: TVar Int -- ^ Alice
-  -> TVar Int -- ^ Bob
-  -> IO ()
-transfer aliceVar bobVar = atomically $ do
-    let amt = 40
-    aliceOrig <- readTVar aliceVar
-    -- are we actually able to
-    check $ aliceOrig >= amt
-    -- else retry
-
-    writeTVar aliceVar $ aliceOrig - amt
-    bobOrig <- readTVar bobVar
-    writeTVar bobVar $ bobOrig + amt
-
-main :: IO ()
-main = do
-  aliceVar <- newTVarIO 0
-  bobVar <- newTVarIO 0
-  race_ (payAlice aliceVar) (transfer aliceVar bobVar)
-  alice <- atomically $ readTVar aliceVar
-  bob <- atomically $ readTVar bobVar
-  putStrLn $ "Alice has: " ++ show alice
-  putStrLn $ "Bob has: " ++ show bob
-```
-
 OOP's promise of hiding implementation details is not a good one in a system
 where mutable state is present. We can't really be completely sure about what
 the code will do, any developer is free to change code and may not satisfy our
@@ -121,9 +83,8 @@ is easier and cleaner to repeat myself than to deal with abstractions.
 This may be surprising given that I have wrote quite a bit on how OOP is awful
 and you should never use it. I don't think OOP necessarily forces bad code, I
 simply think that the current popular implementations of OOP are bad. In my
-opinion something like Smalltalk is still better in some ways than Java/C#, in
-fact the inventor of OOP, Alan Kay stated that the big idea with OOP is message
-passing, something both languages don't really focus on.
+opinion something like Smalltalk is still better in some ways than Java/C#, ~~~in
+fact the inventor of OOP, Alan Kay stated that the big idea with OOP is message passing,~~~(Hillel Wayne refutes that Kay made this claim) something both languages don't really focus on.
 
 Besides this, I don't believe that there can't exist an OOP language that avoids
 some of the issues that I have talked about above. I personally think a more
