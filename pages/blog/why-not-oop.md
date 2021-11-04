@@ -83,8 +83,8 @@ is easier and cleaner to repeat myself than to deal with abstractions.
 This may be surprising given that I have wrote quite a bit on how OOP is awful
 and you should never use it. I don't think OOP necessarily forces bad code, I
 simply think that the current popular implementations of OOP are bad. In my
-opinion something like Smalltalk is still better in some ways than Java/C#, ~~~in
-fact the inventor of OOP, Alan Kay stated that the big idea with OOP is message passing,~~~(Hillel Wayne refutes that Kay made this claim) something both languages don't really focus on.
+opinion something like Smalltalk is still better in some ways than Java/C#, ~~in
+fact the inventor of OOP, Alan Kay stated that the big idea with OOP is message passing,~~(Hillel Wayne refutes that Kay made this claim) something both languages don't really focus on.
 
 Besides this, I don't believe that there can't exist an OOP language that avoids
 some of the issues that I have talked about above. I personally think a more
