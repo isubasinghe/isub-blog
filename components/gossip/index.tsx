@@ -42,12 +42,12 @@ const Gossip = () => {
     { id: 0, state: true, label: "Node 0" },
   ]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  const { register, handleSubmit } = useForm<NodeInput>();
+  const { register, handleSubmit } = useForm();
 
   const {
     register: registerEdge,
     handleSubmit: handleSubmitEdge,
-  } = useForm<EdgeInput>();
+  } = useForm();
 
   const onSubmit = (data: NodeInput) => {
     setNodes((old) => {
@@ -128,10 +128,10 @@ const Gossip = () => {
             <input
               name="id"
               type="number"
-              ref={register({ required: true, valueAsNumber: true })}
+              {...register("id",{ required: true, valueAsNumber: true })}
             />
           </p>
-          <select name="type" ref={register}>
+          <select name="type" {...register("type", { required: true })}>
             <option value="add">Add</option>
             <option value="remove">Remove</option>
           </select>
@@ -150,7 +150,7 @@ const Gossip = () => {
             <input
               name="to"
               type="number"
-              ref={registerEdge({ required: true, valueAsNumber: true })}
+              {...registerEdge("to", { required: true, valueAsNumber: true })}
             />
           </p>
           <p>
@@ -158,10 +158,10 @@ const Gossip = () => {
             <input
               name="from"
               type="number"
-              ref={registerEdge({ required: true, valueAsNumber: true })}
+              {...registerEdge("from", { required: true, valueAsNumber: true })}
             />
           </p>
-          <select name="type" ref={registerEdge}>
+          <select name="type" {...registerEdge("type")}>
             <option value="add">Add</option>
             <option value="remove">Remove</option>
           </select>
