@@ -33,18 +33,8 @@ const Home = () => (
       you can have a look <a style={{fontSize:"16px"}} href="https://github.com/isubasinghe">here</a>
     </p>
     <p><strong>This following section is mainly aimed at recruiters so they can develop an understanding of what I am like as a programmer and what values I bring into their engineering organisation.</strong></p>
-    <h3>Engineering</h3>
-    <ul>
-      <li>We have an obligation not to waste resources - tech like Electron are bad</li>
-      <li>Performance is crucial - don't make the user wait</li>
-      <li>Correctness is crucial - having at least some knowledge of formal verification is good</li>
-      <li>Avoid non determinism where possible</li>
-      <li>Write simple code</li>
-      <li>If it can be done at compile time, it should be done at compile time</li>
-    </ul>
-    <p>Unfortunately, the above criteria do not come in isolation, most of the time it is a balance and what that balance looks like is domain dependant.</p>
     <h3>Programming Languages - Preferred Languages in Bold</h3>
-    I generally prefer languages with strong types, as this makes programming easier for me. Being able to write programs that can be 
+    I generally prefer languages with strong types, as this makes programming easier for me. Being able to write programs with properties that can be 
     verified at compile time is a huge help. C++ (I should elaborate more here) and C do not exactly fall into this category but I still like these languages for perhaps more sentimental reasons.
     <ul>
       <li><strong>C++</strong></li>
