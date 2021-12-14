@@ -1,0 +1,13 @@
+{
+  "name": "Incremental, Data-Parallel Graph Clustering",
+  "description": "Louvain modularity optimisation using Differential Dataflow",
+  "affiliations": ["The University of Melbourne"],
+  "supervisor": "Dr. Shanika Karunasekara", 
+  "pdfurl": "",
+  "bibliography": {
+    "type": "fileref",
+    "file": "incremental-data-parallel-graph-clustering.bib"
+  },
+  "reason": "Thesis",
+  "grade": 85
+}
