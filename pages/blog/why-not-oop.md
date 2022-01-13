@@ -6,9 +6,15 @@ date: 2021-4-3
 ---
 
 ## TL;DR 
-Languages like Java/C# leave little for the compiler to prove regarding the "well-definedness" of a program, this in term leaves 
+Languages like Java/C# leave little for the compiler to prove regarding the "well-definedness" of a program, this in turn leaves 
 the programmer to dynamically verify more properties of their code, I would also like to argue that current OOP languages worsen the challenges of this task by the programmer. 
-OOP doesn't necessarily have to be bad, I think that these issues can be fixed by a more restricitve type system.
+OOP doesn't necessarily have to be bad, I think that these issues can be fixed by a more restricitve type system. 
+
+**WARNING**
+
+This is a bit of a rambling, **please feel free to ignore**, I don't think 
+I have captured my thoughts elegantly. This could also be due to my experiences with existing Java codebases at Government, which has really put a bad taste in my mouth. 
+I have heard good things about other OOP languages, such as Common Lisp (CLOS), so this may very well be Java centric. 
 
 ## Why not OOP?
 
@@ -53,30 +59,29 @@ control flow graph from getting too complex. This is important because it is the
 biggest thing that impacts readability. If your data jumps too much around your
 CFG, then your code likely is hard to understand. The tools that OOP provide,
 help with abstraction at the cost of your CFG complexity. With OOP you usually
-have references to the objects you want to mutate, this basically means your CFG
-looks incredibly complex, it is essentialy a denser graph than what it could
+have references to the objects you want to mutate, this means your CFG
+can look incredibly complex, it is essentialy a denser graph than what it could
 have been with FP for example.
+
+#### Mutable state 
 
 OOP as it is presented in languages today such as Java and C# encourage too much
 mutable state, mutable state can get increasingly hard to manage. I think this
 is especially true when concurrent mutation of state is introduced, it becomes
-incredibly hard to juggle all the possible state mutations in your head. Haskell
-for example with STM really shines here, Rust as well, excels here, both present
-excellent solutions to concurrent state modification. Once again this can be
+incredibly hard to juggle all the possible state mutations in your head. 
+
+Let's talk about concurrent modification and verifying that code is free of memory errors. 
+Here a programmer needs to keep track of every variable that is capable of being modified if they want to **gurantee** that code is free of memory errors, in a complex 
+CFG, the programmer might need to keep track of an exponentially growing number of variable states, this has been my biggest problem 
+with working on OOP codebases. I have often encountered complex CFGs, since there is no way to know if a variable will be modified later on in the code or not, every single variable under every 
+single object reachable from some starting point needs to be tracked to ensure they are not concurrently modified. I quickly run out of the capability to keep to track of such a large state space. 
+This hasn't generally been a problem in procedural languages for me, since the state space usually doesn't grow at such a rapid pace and I generally can keep track of all the variables that I need to. 
+
+There are better solutions to concurrent modification that I think are more simple. 
+Haskell for example with STM really shines here, Rust as well, excels here, both present
+excellent solutions for our problem. Once again this can be
 blamed on the programmer, but a good paradigm should stop yourself from shooting
 yourself in the foot.
-
-OOP's promise of hiding implementation details is not a good one in a system
-where mutable state is present. We can't really be completely sure about what
-the code will do, any developer is free to change code and may not satisfy our
-assumptions about that implementation we still have to go and read the code just
-to be sure of what the code is doing. This may not always be true, if you have a
-type system that enforces contracts (Design by Contract, also see the Eiffel
-programming language) I think OOP would fare better here, but it still doesn't
-prevent every possible scenario.
-
-I'm going to go against what a lot of people usually say, for me personally it
-is easier and cleaner to repeat myself than to deal with abstractions.
 
 #### OOP doesn't necessarily need to be bad.
 
@@ -113,17 +118,16 @@ than OOP, simply because it reduces the amount of issues a language has.
 
 Functional Programming can be better than both Procedural Programming and OOP in
 my opinion simply because it controls very explicitly the complexity of your
-control flow graph. Your data flows through the CFG in a very linear fashion,
-this. It isn't perfect, it can be awkward or even impossible to model some
+control flow graph. Your data flows through the CFG in a very linear fashion. 
+It isn't perfect, it can be awkward or even impossible to model some
 imperative datastructures here, and even when there are escape hatches, they are
-awkward to use.
+often awkward to use.
 
 #### Conclusion
 
 I hope everyone was able to agree or disagree without too much frustration or
 anger and that this is somewhat easy to understand but I don't entirely think
-I've organised my thoughts very well. This is something I deeply think about and
-I'd be happy to continue the discussion somewhere else.
+I've organised my thoughts very well. 
 
 Please check the resources section below, I think these authors have outlined
 these issues better than I have.
