@@ -20,7 +20,6 @@ export async function getStaticProps() {
       )
     )
   ).filter((doc) => doc.path !== null && doc.title !== null);
-
   return {
     props: {
       links: metadata,

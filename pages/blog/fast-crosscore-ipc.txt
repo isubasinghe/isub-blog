@@ -1,0 +1,6 @@
+---
+title: Fast CrossCore IPC via cache transfer
+path: fast-crosscore-ipc
+description: Exploring user level message passing
+date: 2022-6-26
+---
