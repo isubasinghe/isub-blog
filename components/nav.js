@@ -20,7 +20,9 @@ const Nav = () => (
         </Link>
       </li>
       <li>
-        <a href="https://isubasinghe.gitbook.io/isithas-wiki/">Wiki</a>
+        <Link href="/wiki">
+          <a>Wiki</a>
+        </Link>
       </li>
     </ul>
     <style jsx>{`

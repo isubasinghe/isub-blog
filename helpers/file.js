@@ -1,5 +1,5 @@
-const { resolve, sep } = require("path");
-const { readdir, readFile } = require("fs").promises;
+const { resolve, sep, join } = require("path");
+const { readdir, readFile, opendir } = require("fs").promises;
 const matter = require("gray-matter");
 const TrieMap = require("mnemonist/trie-map");
 
@@ -37,6 +37,25 @@ async function getFiles(dir) {
   return Array.prototype.concat(...files);
 }
 
+async function walkDir(dir, ctxt) {
+  if (ctxt == null) {
+    ctxt = {parent: null, nodes: [], isDir: true, relpath: ''};
+  }
+  for await (const d of await opendir(dir)) {
+    const entry = join(dir, d.name); 
+    if (d.isDirectory()) {
+      const node = { parent: ctxt, nodes: [], isDir: true, relpath: join(ctxt.relpath, d.name) };
+      ctxt.nodes.push(node);
+      await walkDir(entry, node);
+    }
+    else if (d.isFile()) {
+      const node = { parent: ctxt, nodes: [], isDir: false, relpath: join(ctxt.relpath, d.name) };
+      ctxt.nodes.push(node);
+    }
+  }
+  return ctxt
+}
+
 async function getContentData(file) {
   const location = relativeNodes(file);
 
@@ -59,4 +78,4 @@ async function getMetadata(file) {
   return data;
 }
 
-module.exports = { getFiles, getContentData, getMetadata };
+module.exports = { getFiles, getContentData, getMetadata, walkDir };
