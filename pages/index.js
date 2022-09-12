@@ -12,10 +12,10 @@ const Home = () => (
         content="Isitha Subasinghe's blogging platform and portfolio. You can find about my skills, projects and blogs here."
       />
     </Head>
-    <h1>Isitha's Home Page</h1>
     <Nav />
+    <h1>Isitha's Home Page</h1>
 
-    <h2>Hey I am Isitha Subasinghe</h2>
+    <h2>Hey I am Isitha,</h2>
     <p>
       I love computers and hacking around with them, I have been programming
       since I was in primary school.

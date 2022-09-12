@@ -13,8 +13,8 @@ const Wiki = () => {
           content="Isitha Subasinghe's knowledge wikipedia"
         />
       </Head>
-      <h1>Projects</h1>
       <Nav />
+      <h1>Wiki</h1>
     </>
   );
 };

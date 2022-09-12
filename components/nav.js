@@ -16,7 +16,7 @@ const Nav = () => (
       </li>
       <li>
         <Link href="/blog">
-          <a>Blogs</a>
+          <a>Blog</a>
         </Link>
       </li>
       <li>

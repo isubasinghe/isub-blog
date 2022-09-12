@@ -33,8 +33,8 @@ const Blog = ({ links }) => {
       <Head>
         <title>Isitha's Blogs</title>
       </Head>
-      <h1>Blogs</h1>
       <Nav />
+      <h1>Blog Posts</h1>
       <h2 />
       <h3 />
       <h4>My thoughts, experiments, ideas and tutorials</h4>
