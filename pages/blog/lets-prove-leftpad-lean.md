@@ -28,11 +28,17 @@ For example `leftpad("Hello", 'a', 4)` would result in the string `aaaaHello`.
 # What is Lean?
 Lean is a theorem prover and also a functional language, this means that you 
 can write code that can be proved to adhere to some specification. With Lean, 
-you don't need to test your code, you can prove it. 
+you don't _need_ to test your code, **you can prove it**. 
+
+Proofs are a much stronger guarantee of correctness than testing, to quote Edsger Dijkstra,
+"Program testing can be used to show the presence of bugs, but never to show their
+absence!". 
 
 # Setting up Lean
 You can use [elan](https://github.com/leanprover/elan) to download and setup Lean.
 Elan is like a `rustup` or `ghcup` tool for Lean.
+
+Details on this will be omitted for brevity, but they are available on GitHub.
 
 # Starting a new lean project
 After the install of elan, you should have the `lake` command available, 
@@ -73,4 +79,47 @@ def drop (l: List α) (n: Nat): Option (List α) :=
     | [] => none 
     | _::xs => drop xs (n-1)
 ```
+
+
+### Proving that dropping the padded characters results in the original string
+```lean
+theorem drop_leftpad_eq_orig (l: List α) (a: α) (n: Nat): drop (leftpad l a n) n = l := by
+  induction n with
+  | zero => 
+    simp
+    rw [leftpad]
+    simp
+    unfold drop
+    simp
+  | succ z iz => 
+    rw [<-Nat.add_one]
+    rw [<-iz]
+    rfl
+```
+g### Proving that the n values are all replicated padding characters
+```lean
+theorem drop_leftpad_eq_orig (l: List α) (a: α) (n: Nat): drop (leftpad l a n) n = l := by
+  induction n with
+  | zero => 
+    simp
+    rw [leftpad]
+    simp
+    unfold drop
+    simp
+  | succ z iz => 
+    rw [<-Nat.add_one]
+    rw [<-iz]
+    rfl
+```
+
+### How do we know that these two functions adequately capture the 'specification' of leftpad?
+Generally we cannot do such a thing, coming up with the 'correct' specification requires some
+human creativity. 
+This also means that there is still a possibility of error, an incorrect
+'specification' will lead to a proof of an irrelevant program.
+
+Proofs help us add trustworthiness between the specification and the program at play.
+
+It's important to note that this notion of specification is also captured in testing,
+albeit less precisely, meaning that verification is **strictly** better than testing.
 
