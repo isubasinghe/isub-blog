@@ -96,7 +96,7 @@ theorem drop_leftpad_eq_orig (l: List α) (a: α) (n: Nat): drop (leftpad l a n)
     rw [<-iz]
     rfl
 ```
-g### Proving that the n values are all replicated padding characters
+### Proving that the n values are all replicated padding characters
 ```lean
 theorem drop_leftpad_eq_orig (l: List α) (a: α) (n: Nat): drop (leftpad l a n) n = l := by
   induction n with
