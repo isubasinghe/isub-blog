@@ -30,9 +30,9 @@ export async function getStaticProps() {
 const Blog = ({ links }) => {
   return <>
     <Head>
-      <title>Isitha's Blogs</title>
+      <title>Isitha's Blog</title>
     </Head>
-    <h1>Blogs</h1>
+    <h1>Blog</h1>
     <Nav />
     <h2 />
     <h3 />
