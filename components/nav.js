@@ -5,17 +5,17 @@ const Nav = () => (
   <nav>
     <ul>
       <li>
-        <Link href="/">
+        <Link href="/" legacyBehavior>
           <a>Home</a>
         </Link>
       </li>
       <li>
-        <Link href="/projects">
+        <Link href="/projects" legacyBehavior>
           <a>Projects</a>
         </Link>
       </li>
       <li>
-        <Link href="/blog">
+        <Link href="/blog" legacyBehavior>
           <a>Blog</a>
         </Link>
       </li>

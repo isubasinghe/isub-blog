@@ -28,41 +28,39 @@ export async function getStaticProps() {
 }
 
 const Blog = ({ links }) => {
-  return (
-    <>
-      <Head>
-        <title>Isitha's Blogs</title>
-      </Head>
-      <h1>Blogs</h1>
-      <Nav />
-      <h2 />
-      <h3 />
-      <h4>My thoughts, experiments, ideas and tutorials</h4>
-      <ul>
-        {links &&
-          links.map((link) => {
-            return (
-              <li key={link.path}>
-                <Link href={`/blog/${link.path}`}>
-                  <a>{link.title}</a>
-                </Link>
-                <style jsx>{`
-                  a {
-                    font-size: 1rem;
-                  }
-                  li {
-                    font-size: 1rem;
-                  }
-                  li:not(:last-child) {
-                    margin-bottom: 1rem;
-                  }
-                `}</style>
-              </li>
-            );
-          })}
-      </ul>
-    </>
-  );
+  return <>
+    <Head>
+      <title>Isitha's Blogs</title>
+    </Head>
+    <h1>Blogs</h1>
+    <Nav />
+    <h2 />
+    <h3 />
+    <h4>My thoughts, experiments, ideas and tutorials</h4>
+    <ul>
+      {links &&
+        links.map((link) => {
+          return (
+            <li key={link.path}>
+              <Link href={`/blog/${link.path}`} legacyBehavior>
+                <a>{link.title}</a>
+              </Link>
+              <style jsx>{`
+                a {
+                  font-size: 1rem;
+                }
+                li {
+                  font-size: 1rem;
+                }
+                li:not(:last-child) {
+                  margin-bottom: 1rem;
+                }
+              `}</style>
+            </li>
+          );
+        })}
+    </ul>
+  </>;
 };
 
 export default Blog;
