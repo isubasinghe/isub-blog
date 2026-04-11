@@ -11,6 +11,7 @@
   "dependencies": {
     "@astrojs/mdx": "^4.2.6",
     "@astrojs/solid-js": "^5.0.4",
+    "@astrojs/vercel": "^9.0.5",
     "astro": "^5.7.10",
     "katex": "^0.16.21",
     "rehype-katex": "^7.0.1",
