@@ -15,6 +15,7 @@ I remember being curious as to how three numbers, Euler's number, pi and i, two 
 could give -1.
 
 $$
+\begin{gathered}
 Proof\enspace of\enspace{e}^{\pi*i} = -1
 \\
 z=\cos{\theta} + i*\sin{\theta}
@@ -44,6 +45,7 @@ When \enspace \theta=\pi
 -1 + i*0 = e^{i*\pi}
 \\
 e^{i*\pi} = -1
+\end{gathered}
 $$
 
 #### Opinions on KaTex
