@@ -1,0 +1,43 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="dns-prefetch" href="https://wiki.isub.dev" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css"
+      integrity="sha384-zh0CIslj3dQfMKhfrLMFi9FGEVEBQxijSvjRYIgKGsx3n4GC0FQwEB2GNUaj9v4p"
+      crossorigin="anonymous"
+    />
+    <title>{title}</title>
+    {description && <meta name="description" content={description} />}
+  </head>
+  <body>
+    <div class="container">
+      <slot />
+    </div>
+    <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
+  </body>
+</html>
+
+<style>
+  .container {
+    max-width: 45rem;
+    margin: 0 auto;
+    margin-top: 2rem;
+  }
+</style>
+
+<style is:global>
+  @import '../styles.css';
+</style>

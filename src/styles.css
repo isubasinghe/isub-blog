@@ -1,0 +1,13 @@
+:root {
+  font-family: Verdana, sans-serif;
+  font-size: 16px;
+}
+
+a {
+  color: #1768ac;
+  font-size: 1.25rem;
+}
+
+.mspace.newline {
+  margin-top: 1.5rem;
+}
