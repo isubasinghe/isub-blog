@@ -9,7 +9,6 @@
     "preview": "astro preview"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.8",
     "@astrojs/mdx": "^4.2.6",
     "@astrojs/solid-js": "^5.0.4",
     "astro": "^5.7.10",
@@ -21,6 +20,7 @@
     "vis-network": "^9.1.9"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.8",
     "typescript": "^5.8.3"
   }
 }
