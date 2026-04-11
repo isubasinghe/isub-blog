@@ -1,5 +1,5 @@
 import { createStore } from 'solid-js/store';
-import { Show } from 'solid-js';
+import { For, Show } from 'solid-js';
 
 type Value = {
   counter: number;
@@ -64,18 +64,22 @@ export default function VClockMan() {
       `}</style>
 
       <table>
-        <tr>
-          <th>State</th>
-          {Object.keys(clock0.clocks).map((k) => (
-            <th>V[{k}]</th>
-          ))}
-        </tr>
-        <tr>
-          <td>{clock0.clocks[0].state}</td>
-          {Object.keys(clock0.clocks).map((k) => (
-            <td>{clock0.clocks[Number(k)].counter}</td>
-          ))}
-        </tr>
+        <thead>
+          <tr>
+            <th>State</th>
+            <For each={Object.keys(clock0.clocks)}>{(k) =>
+              <th>V[{k}]</th>
+            }</For>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{clock0.clocks[0].state}</td>
+            <For each={Object.keys(clock0.clocks)}>{(k) =>
+              <td>{clock0.clocks[Number(k)].counter}</td>
+            }</For>
+          </tr>
+        </tbody>
       </table>
 
       <div class="buttons">
@@ -87,18 +91,22 @@ export default function VClockMan() {
       </div>
 
       <table>
-        <tr>
-          <th>State</th>
-          {Object.keys(clock1.clocks).map((k) => (
-            <th>V[{k}]</th>
-          ))}
-        </tr>
-        <tr>
-          <td>{clock1.clocks[1].state}</td>
-          {Object.keys(clock1.clocks).map((k) => (
-            <td>{clock1.clocks[Number(k)].counter}</td>
-          ))}
-        </tr>
+        <thead>
+          <tr>
+            <th>State</th>
+            <For each={Object.keys(clock1.clocks)}>{(k) =>
+              <th>V[{k}]</th>
+            }</For>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{clock1.clocks[1].state}</td>
+            <For each={Object.keys(clock1.clocks)}>{(k) =>
+              <td>{clock1.clocks[Number(k)].counter}</td>
+            }</For>
+          </tr>
+        </tbody>
       </table>
 
       <div class="buttons">
