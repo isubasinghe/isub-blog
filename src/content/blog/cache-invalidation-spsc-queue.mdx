@@ -11,7 +11,9 @@ import AtomicOpsCalculator from '../../components/AtomicOpsCalculator.tsx';
 
 # Cache Invalidation Makes Your Code Fast: Building a 21.9 GiB/s SPSC queue.
 
-Cache invalidation is normaly seen as a bad thing, but this doesn't always have to be the case. There are ways in which you can (ab)use the cache coherency protocol to get data transfer over the memory fabric itself.
+### 78,561 sampled memory operations. 18 hit DRAM. The rest never left cache.
+
+Cache invalidation is normally seen as a bad thing, but this doesn't always have to be the case. There are ways in which you can (ab)use the cache coherency protocol to get data transfer over the memory fabric itself.
 
 As a part of my yak shaving for my key value database named <a href="https://github.com/isubasinghe/kvellox" target="_blank" rel="noreferrer noopener">kvell</a>, I built a stupidly fast spsc queue over a ring buffer.
 

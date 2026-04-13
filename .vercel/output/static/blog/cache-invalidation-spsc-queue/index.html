@@ -2,7 +2,8 @@
 a[data-astro-cid-g5kbnxd7]{text-decoration:none}
 .date[data-astro-cid-7jjqptxk]{margin-top:20px;text-decoration:underline;display:flex;justify-content:flex-end}a[data-astro-cid-7jjqptxk]{font-size:1rem}
 </style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <a href="/blog" data-astro-cid-g5kbnxd7>&lt;</a>  <div class="date" data-astro-cid-7jjqptxk>Published Date: 2026-4-13</div><h1 id="cache-invalidation-makes-your-code-fast-building-a-219-gibs-spsc-queue">Cache Invalidation Makes Your Code Fast: Building a 21.9 GiB/s SPSC queue.</h1>
-<p>Cache invalidation is normaly seen as a bad thing, but this doesn’t always have to be the case. There are ways in which you can (ab)use the cache coherency protocol to get data transfer over the memory fabric itself.</p>
+<h3 id="78561-sampled-memory-operations-18-hit-dram-the-rest-never-left-cache">78,561 sampled memory operations. 18 hit DRAM. The rest never left cache.</h3>
+<p>Cache invalidation is normally seen as a bad thing, but this doesn’t always have to be the case. There are ways in which you can (ab)use the cache coherency protocol to get data transfer over the memory fabric itself.</p>
 <p>As a part of my yak shaving for my key value database named <a href="https://github.com/isubasinghe/kvellox" target="_blank" rel="noreferrer noopener">kvell</a>, I built a stupidly fast spsc queue over a ring buffer.</p>
 <p>The implementation focussed on achieving:</p>
 <ul>
