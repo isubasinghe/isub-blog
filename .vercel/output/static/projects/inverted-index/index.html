@@ -1,0 +1,44 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="dns-prefetch" href="https://wiki.isub.dev"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Inverted Index</title><meta name="description" content="Building a search engine in C++"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.container[data-astro-cid-37fxchfa]{max-width:45rem;margin:0 auto;margin-top:2rem}
+a[data-astro-cid-g5kbnxd7]{text-decoration:none}
+</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <a href="/projects" data-astro-cid-g5kbnxd7>&lt;</a>  <h2 id="inverted-index">Inverted Index</h2>
+<hr>
+I am currently building a search engine in C++.
+I was very interested in learning how search engines work after my undergrad Design of Algorithms course
+where we implemented a top K algorithm that obtained the top K search results from an inverted index.
+<hr> 
+I implemented a finite state automata to store words, due to the natural compression present in such a datastructure.
+But I recently have read a paper on `Adaptive Radix Trees`, and it was obvious that this is a much more efficient data structure,
+in terms of storage space.
+<p>I am interested in adding RocksDB as a persistent backend to this implementation.</p>
+<p>Following this I would love to introduce a concensus layer, Raft most likely, to introduce sharding in this system.</p>
+<p>I really need to clean the code up as well, its quite disgusting at the moment.</p>
+<hr>
+<p>My main concern about this project at the moment however, is efficient fuzzy search.
+Obviously generating all words with edit distance <code>n</code> is not a viable solution.</p>
+<hr>
+I'm looking forward to getting stuck into this project after exams are over.
+<hr>
+**UPDATE: 2/12/2020**
+<p>I have started rewriting the search engine in Rust.
+So far I have added quite a lot more functionality when compared to the C++ implementation.</p>
+<ul>
+<li>Supports prefix encoding along with suffix encoding thanks to the finite state transducer library by BurntSushi</li>
+<li>Supports persisted data, using spacejam’s sled database</li>
+<li>Support for inserts while in operation at a low cost</li>
+<li>Support for re-indexing while in operation</li>
+<li>Support stemming for 17 languages</li>
+<li>Supports unicode text tokenisation</li>
+<li>Supports BM25 for scoring</li>
+<li>Supports a Web API</li>
+<li>Supports (soon) gRPC</li>
+<li>Coming soon: faceting</li>
+<li>Coming eventually (hopefully) Clustering, Concensus, etc. for a distributed search engine</li>
+</ul>
+<p>
+The system is extremely fast at writes according to my benchmarks.It doesn't favour concurrency however, 
+I will most likely expose a channel that the Inverted Index can read write jobs from. I think this 
+will reduce thread contention and improve performance by a significant margin. 
+</p><p>I was able to achieve on average 15ms for an insertion of 148KB.
+Including all deserialization and serialization costs, the average insertion jumped to about 50ms for this document.
+The most important criteria was thread contention, when concurrency increased the time increased significantly.</p>
+<p></p>  </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>  
