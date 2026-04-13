@@ -1,0 +1,16 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import VClockMan from '../components/VClock.tsx';
+import BerkeleyClockSync from '../components/clock/Berkeley.tsx';
+import Gossip from '../components/Gossip.tsx';
+---
+
+<BaseLayout title="Test Page">
+  <h1>Component Test Page</h1>
+  <h2>Vector Clocks</h2>
+  <VClockMan client:load />
+  <h2>Berkeley Clock Sync</h2>
+  <BerkeleyClockSync client:load />
+  <h2>Gossip Protocol</h2>
+  <Gossip client:load />
+</BaseLayout>

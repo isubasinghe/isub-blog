@@ -1,0 +1,37 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Back from '../../components/Back.astro';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({
+    params: { slug: post.data.path },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+const description = post.data.description || `Isitha Subasinghe ${post.data.title} programming project`;
+---
+
+<BaseLayout title={post.data.title} description={description}>
+  <Back url="/blog" />
+  {post.data.date && (
+    <div class="date">Published Date: {post.data.date}</div>
+  )}
+  <Content />
+</BaseLayout>
+
+<style>
+  .date {
+    margin-top: 20px;
+    text-decoration: underline;
+    display: flex;
+    justify-content: flex-end;
+  }
+  a {
+    font-size: 1rem;
+  }
+</style>

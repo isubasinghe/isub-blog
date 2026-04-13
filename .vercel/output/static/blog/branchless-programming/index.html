@@ -1,0 +1,88 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="dns-prefetch" href="https://wiki.isub.dev"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Branchless Programming</title><meta name="description" content="A quick introduction to branchless programming"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.container[data-astro-cid-37fxchfa]{max-width:45rem;margin:0 auto;margin-top:2rem}
+a[data-astro-cid-g5kbnxd7]{text-decoration:none}
+.date[data-astro-cid-7jjqptxk]{margin-top:20px;text-decoration:underline;display:flex;justify-content:flex-end}a[data-astro-cid-7jjqptxk]{font-size:1rem}
+</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <a href="/blog" data-astro-cid-g5kbnxd7>&lt;</a>  <div class="date" data-astro-cid-7jjqptxk>Published Date: 2021-3-5</div><h2 id="a-quick-introduction-to-branchless-programming">A quick introduction to branchless programming</h2>
+<p><strong>Note:</strong> Modern compiler’s are quite smart, it is likely this technique might
+reduce performance. In order to ensure performance, please use a tool to view
+your assembly output and compare the performance of a naive version and the
+optimised version.</p>
+<h3 id="what-is-branchless-programming">What is branchless programming?</h3>
+<p>Branchless programming is the art of writing programs that minimise the use of
+<code>jmp</code> instructions.</p>
+<h3 id="why-is-this-important">Why is this important?</h3>
+<p>Modern CPUs follow a pipeline architecture. Meaning that it can run a sequence
+of instructions simultaneously. The CPU will not know what instruction to
+execute following a jump instruction. There are mitigations to this issue,
+namely branch predictors but if the prediction is wrong all the work done is
+discarded, this is obvisouly bad for performance, since we need to start over
+again.</p>
+<p>Have a look <a href="https://stackoverflow.com/questions/9820319/why-is-a-cpu-branch-instruction-slow" target="_blank" rel="noreferrer noopener">here</a>
+for more information.</p>
+<p>If we directly map if statements to assembly, we see <code>jmp</code> statements, it isn’t
+just if statements that cause <code>jmp</code> statements to be used, but they are the most
+frequent. Here is a small example.</p>
+<p><strong>Note</strong>: Instead of mapping into <code>x86</code>, I decided to make up a tiny instruction
+set as I think this should make it more obvious.</p>
+<h4 id="c">C</h4>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="c"><code><span class="line"><span style="color:#F97583">if</span><span style="color:#E1E4E8">(x </span><span style="color:#F97583">>=</span><span style="color:#79B8FF"> 0</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#B392F0">    do_something</span><span style="color:#E1E4E8">();</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h4 id="assembler">Assembler</h4>
+<p>Small note, this is a made up assembly language.</p>
+<p>Assume the variable <code>x</code> is loaded to register <code>r0</code> and the constant 0 is loaded
+to register <code>r1</code>.</p>
+<p>The instruction <code>geq</code> is used in this format <code>geq &#x3C;src> &#x3C;v1> &#x3C;v2></code>.</p>
+<p>The instruction <code>jmp_true</code> is used in this format <code>jmp_true &#x3C;register> &#x3C;label></code>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span></span></span>
+<span class="line"><span>; Comparision happens here</span></span>
+<span class="line"><span>geq r2 r0 r1</span></span>
+<span class="line"><span>jmp_true r2 .false_condition</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>; True Condition starts here</span></span>
+<span class="line"><span>call do_something</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>; False Condition</span></span>
+<span class="line"><span>.false_condition</span></span>
+<span class="line"><span></span></span></code></pre>
+<p>There are two cases that I believe make use of branchless programming.</p>
+<ul>
+<li>Cryptography (I am not entirely sure about this)</li>
+<li>High performance code</li>
+</ul>
+<h4 id="cryptography">Cryptography</h4>
+<p>The claims I have seen online are that branchless code prevent information
+leaks. This makes sense as information is leaked through timing attacks. I did
+find <a target="_blank" rel="noreferrer noopener" href="https://crypto.stackexchange.com/questions/30630/branchless-aes-implementation">this.</a>
+What they have written about makes sense, please note however that this is AES
+specific, I did not know this before now but apparently the AES instruction set
+increases the resistance to side channel attacks, I would imagine other
+cryptographic protocols are maybe more vulnerable to side channel attacks, so
+branchless programming would likely be criticial there.</p>
+<h3 id="a-tiny-inefficient-example">A tiny (inefficient) example</h3>
+<p>I can’t think of a better example than what whatsacreel (linked below) has. I
+think that example is small and shows branchless programming minimalistically.</p>
+<h4 id="branched-version">Branched version</h4>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="c"><code><span class="line"><span style="color:#F97583">int</span><span style="color:#B392F0"> min</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">int</span><span style="color:#FFAB70"> a</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">int</span><span style="color:#FFAB70"> b</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> a </span><span style="color:#F97583">&#x3C;</span><span style="color:#E1E4E8"> b </span><span style="color:#F97583">?</span><span style="color:#E1E4E8"> a </span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> b;</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<h4 id="branchless-version">Branchless version</h4>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="c"><code><span class="line"><span style="color:#F97583">int</span><span style="color:#B392F0"> min</span><span style="color:#E1E4E8">(</span><span style="color:#F97583">int</span><span style="color:#FFAB70"> a</span><span style="color:#E1E4E8">, </span><span style="color:#F97583">int</span><span style="color:#FFAB70"> b</span><span style="color:#E1E4E8">) {</span></span>
+<span class="line"><span style="color:#F97583">    return</span><span style="color:#E1E4E8"> a</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">(a</span><span style="color:#F97583">&#x3C;</span><span style="color:#E1E4E8">b) </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> b</span><span style="color:#F97583">*</span><span style="color:#E1E4E8">(b</span><span style="color:#F97583">&#x3C;=</span><span style="color:#E1E4E8">a);</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p><strong>Note:</strong> More examples are available <a target="_blank" rel="noreferrer noopener" href="https://hbfs.wordpress.com/2008/08/05/branchless-equivalents-of-simple-functions/">here.</a></p>
+<h3 id="resources">Resources</h3>
+<ul>
+<li><a target="_blank" rel="noreferrer noopener" href="https://www.agner.org/optimize/">Agner
+Fog</a></li>
+<li><a target="_blank" rel="noreferrer noopener" href="https://www.youtube.com/watch?v=bVJ-mWWL7cE">What’s
+a Creel</a></li>
+<li><a target="_blank" rel="noreferrer noopener" href="https://stackoverflow.com/questions/9820319/why-is-a-cpu-branch-instruction-slow">Stackoverflow -
+Why is a CPU branch slow </a></li>
+<li><a target="_blank" rel="noreferrer noopener" href="https://johnysswlab.com/how-branches-influence-the-performance-of-your-code-and-what-can-you-do-about-it/">Johny’s
+Software Lab - How branches influence the performance of your code and what
+can you do about it?</a></li>
+<li><a target="_blank" rel="noreferrer noopener" href="https://www.bfilipek.com/2017/05/curius-case-of-branch-performance.html#summary">Bartek’s
+coding blog - Curious case of branch performance </a></li>
+<li><a target="_blank" rel="noreferrer noopener" href="https://hbfs.wordpress.com/2008/08/05/branchless-equivalents-of-simple-functions/">Harder,
+Better, Faster, Stronger - Branchless Equivalents of Simple Functions</a></li>
+</ul>  </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>   

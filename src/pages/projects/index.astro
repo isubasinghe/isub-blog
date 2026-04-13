@@ -1,0 +1,26 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Nav from '../../components/Nav.astro';
+
+const projects = await getCollection('projects');
+---
+
+<BaseLayout title="Isitha's Projects" description="Isitha Subasinghe's projects developed for fun and curiosity">
+  <h1>Projects</h1>
+  <Nav />
+  <h4>A list of projects I have worked on in my spare time</h4>
+  <ul>
+    {projects.map((project) => (
+      <li>
+        <a href={`/projects/${project.data.path}`}>{project.data.title}</a>
+      </li>
+    ))}
+  </ul>
+</BaseLayout>
+
+<style>
+  a {
+    font-size: 1rem;
+  }
+</style>

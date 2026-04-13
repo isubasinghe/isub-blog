@@ -1,0 +1,31 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="dns-prefetch" href="https://wiki.isub.dev"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Writing a microkernel in Rust - Part 1</title><meta name="description" content="Isitha Subasinghe Writing a microkernel in Rust - Part 1 programming project"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.container[data-astro-cid-37fxchfa]{max-width:45rem;margin:0 auto;margin-top:2rem}
+a[data-astro-cid-g5kbnxd7]{text-decoration:none}
+.date[data-astro-cid-7jjqptxk]{margin-top:20px;text-decoration:underline;display:flex;justify-content:flex-end}a[data-astro-cid-7jjqptxk]{font-size:1rem}
+</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <a href="/blog" data-astro-cid-g5kbnxd7>&lt;</a>  <div class="date" data-astro-cid-7jjqptxk>Published Date: 2023-2-18</div><h1 id="writing-a-microkernel-in-rust-part-1">Writing a microkernel in Rust: Part 1</h1>
+<h2 id="introduction">Introduction</h2>
+<p>While there are many tutorials on building operating systems, there are none on building microkernels.
+This is somewhat of an ambitious attempt to fill that gap. We will implement a simple microkernel with extremely fast IPC, not being
+shy to resort to assembly code if we must. The platform we will be targetting is the RISC-V virt platform on QEMU. RISC-V and a virtual platform should keep things simple enough for us. If we get time, we can also cover
+porting this code to support other platforms as well.</p>
+<h2 id="risc-v-linker-relaxation">RISC-V Linker Relaxation</h2>
+<p>Please read more about this <a href="https://www.sifive.com/blog/all-aboard-part-3-linker-relaxation-in-riscv-toolchain">here</a>. We will disable this by
+the following code, we also set the global pointer to something we defined in our <a href="https://github.com/isubasinghe/ukernel/tree/main/src/lds/virt.ld">linker</a>:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="asm"><code><span class="line"><span style="color:#6A737D">; boot.S file</span></span>
+<span class="line"><span style="color:#E1E4E8">.option </span><span style="color:#F97583">push</span></span>
+<span class="line"><span style="color:#E1E4E8">.option norelax</span></span>
+<span class="line"><span style="color:#E1E4E8">	la		gp, _global_pointer</span></span>
+<span class="line"><span style="color:#E1E4E8">.option </span><span style="color:#F97583">pop</span></span></code></pre>
+<h2 id="starting-up-our-hart">Starting up our HART</h2>
+<p>In RISC-V cores are referred to as HART, in our boot file we will setup HART 0 and put the rest of the HARTs to sleep.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="asm"><code><span class="line"><span style="color:#6A737D"># SATP should be zero, but let's make sure. Each HART has its own</span></span>
+<span class="line"><span style="color:#6A737D"># SATP register.</span></span>
+<span class="line"><span style="color:#E1E4E8">csrw	satp, zero</span><span style="color:#6A737D"> # Any hardware threads (hart) that are not bootstrapping</span></span>
+<span class="line"><span style="color:#6A737D"># need to wait for an IPI</span></span>
+<span class="line"><span style="color:#E1E4E8">csrr	t0, mhartid</span></span>
+<span class="line"><span style="color:#E1E4E8">bnez	t0, 4f </span></span></code></pre>
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://riscv.org/technical/specifications/">https://riscv.org/technical/specifications/</a></li>
+<li><a href="https://www.lurklurk.org/linkers/linkers.html">https://www.lurklurk.org/linkers/linkers.html</a></li>
+<li><a href="https://github.com/isubasinghe/ukernel">https://github.com/isubasinghe/ukernel</a></li>
+</ul>  </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>   

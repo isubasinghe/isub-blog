@@ -1,0 +1,22 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="dns-prefetch" href="https://wiki.isub.dev"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Fast intercore IPC - Part 1</title><meta name="description" content="Discovery how the L4 fast IPC works"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.container[data-astro-cid-37fxchfa]{max-width:45rem;margin:0 auto;margin-top:2rem}
+a[data-astro-cid-g5kbnxd7]{text-decoration:none}
+.date[data-astro-cid-7jjqptxk]{margin-top:20px;text-decoration:underline;display:flex;justify-content:flex-end}a[data-astro-cid-7jjqptxk]{font-size:1rem}
+</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <a href="/blog" data-astro-cid-g5kbnxd7>&lt;</a>  <div class="date" data-astro-cid-7jjqptxk>Published Date: 2022-6-26</div><h1 id="fast-intercore-ipc-l4-style-ipc---part-1">Fast Intercore IPC (L4 style IPC) - Part 1</h1>
+<p><code>Note that this article has not been written yet but I thought that it was good to at least put the resources out there. I will update this when my exams are done :)</code></p>
+<h2 id="introduction-to-microkernels">Introduction to Microkernels</h2>
+<p>Most likely you are reading this off your Linux/OSX/Windows device, these OSes use monolithic kernels under the hood(yes I am aware people claim OSX is “hybrid” since it was based on Mach), in these systems
+the various drivers and memory management is part of the kernel. Microkernels are quite different from this approach, they delegate most of the functionality to user space processes, in fact the Microkernel mantra is”if it can be done in user space, it should be done in user space”.</p>
+<p>As you can imagine, the microkernel approach can require a lot more IPC calls than the traditional monolithic approach as a result, this means that if IPC is slow the entire system will also be slow as a result. When the Mach microkernel was released, it unfortunately set back the interest in microkernels as a result of its subpar performance characteristics, and it is one likely reason as to why we don’t see any major operating systems using microkernels.
+While there was significant effort to fix the performance issues, the most notable effort was by Jochen Liedtke</p>
+<h2 id="register-based-trasnfer">Register based trasnfer</h2>
+<p>TODO</p>
+<h2 id="direct-transfer-by-temporary-mapping">Direct Transfer by Temporary Mapping</h2>
+<p>TODO</p>
+<h3 id="further-improvement">Further Improvement</h3>
+<p>As you can see, the TLB introduces a lot of headaches for us when performing direct transfer as described above.
+There is a better solution to this problem than what L4 introduces in my opinion. Given that we perform TLB flushes</p>
+<h2 id="references">References</h2>
+<ul>
+<li><a href="https://dl.acm.org/doi/pdf/10.1145/168619.168633">Improving IPC by kernel design</a></li>
+<li><a href="https://trustworthy.systems/publications/nicta_full_text/8988.pdf">L4 Microkernels: The Lessons from 20 Years of Research and Deployment</a></li>
+</ul>  </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>   

@@ -1,0 +1,32 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Nav from '../../components/Nav.astro';
+
+const posts = await getCollection('blog');
+---
+
+<BaseLayout title="Isitha's Blog">
+  <h1>Blog</h1>
+  <Nav />
+  <h4>My thoughts, experiments, ideas and tutorials</h4>
+  <ul>
+    {posts.map((post) => (
+      <li>
+        <a href={`/blog/${post.data.path}`}>{post.data.title}</a>
+      </li>
+    ))}
+  </ul>
+</BaseLayout>
+
+<style>
+  a {
+    font-size: 1rem;
+  }
+  li {
+    font-size: 1rem;
+  }
+  li:not(:last-child) {
+    margin-bottom: 1rem;
+  }
+</style>
