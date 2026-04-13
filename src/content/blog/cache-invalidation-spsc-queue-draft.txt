@@ -1,0 +1,223 @@
+---
+title: "Cache Invalidation Makes Your Code Fast: Building a 21.9 GiB/s SPSC Queue"
+path: cache-invalidation-spsc-queue-draft
+description: Building a high-throughput SPSC queue by treating the cache coherence protocol as the transport layer
+date: 2026-4-13
+---
+
+# Cache Invalidation Makes Your Code Fast: Building a 21.9 GiB/s SPSC queue.
+
+Cache invalidation is normally seen as a bad thing, but this doesn't always have to be the case. There are ways in which you can (ab)use the cache coherency protocol to get data transfer over the memory fabric itself.
+
+As a part of my yak shaving for my key value database named [kvell](https://github.com/isubasinghe/kvellox), I built a stupidly fast SPSC queue over a ring buffer.
+
+The implementation focussed on achieving:
+  * Minimise TLB misses
+  * Minimise cache misses
+  * Minimise atomic load/stores in order to minimise pipeline stalls.
+  * Maximise vectorisation opportunities.
+  * Minimise the amount of compute as well obviously.
+
+The performance of this queue is mostly due to aspects outside your direct control and that should make you feel uncomfortable as a programmer. But unfortunately, instead of us being given the capability to control the underlying hardware, we are instead given a leaky abstraction of said hardware.
+
+## What is inter-core communication?
+
+When most people think of inter-core communication, shared memory is what pops into mind. Core A copies into a buffer, signals that its done processing and Core B reads off that buffer.
+
+But unfortunately, this is too shallow of a picture of what really goes on under the hood in our tremendously complex hardware.
+
+## An introduction to MESI.
+
+Modern x86 CPUs implement the MESI protocol to keep caches coherent across cores. Every cache line (64 bytes) in the system is in one of four states:
+
+  * **Modified** — This core has written to the line. It's the only valid copy in the system. Main memory is stale.
+  * **Exclusive** — This core has the only copy, but it hasn't been written to yet. Main memory is still up to date.
+  * **Shared** — Multiple cores have a read-only copy of this line.
+  * **Invalid** — The line has been invalidated. It's garbage.
+
+The interesting part is what happens during state transitions. When the producer writes to a cache line, it goes **Modified** in the producer's L1. When the consumer on another core reads that same address, the CPU doesn't go to DRAM. The coherence protocol intercepts the read, snoops the modified line directly from the producer's L1, and transfers it core-to-core. The data never touches main memory.
+
+This is not a side effect. This is the fastest path data can take between two cores. The cache coherence protocol *is* the transport layer.
+
+## The core insight
+
+With a 512-slot ring buffer where each slot is exactly 64 bytes (one cache line), the entire working set is 32 KB — it fits comfortably in L1 cache. In benchmarks, `perf c2c` sampling showed only **18 out of 78,561** sampled memory operations hit DRAM, and those were cold-start page faults. The cache lines just bounce between cores forever, carried by the coherence protocol, never falling out to main memory.
+
+The queue doesn't use shared memory in the way you'd normally think about it. It uses the cache coherence protocol as a core-to-core message bus. Writes go Modified, reads trigger snoops, and the hardware handles the rest. No DRAM involved.
+
+## Why cache-line-sized slots matter
+
+Most SPSC queues treat slot size as arbitrary. You pick a type `T`, the queue allocates `capacity * sizeof(T)` bytes, and away you go. This is a problem if you care about throughput.
+
+Consider a queue of `u32` values. Each element is 4 bytes. A single 64-byte cache line holds 16 elements. When the producer writes slot N, it modifies a cache line that also contains slots N-1, N-2, ... N-15. If the consumer is reading any of those adjacent slots, the producer's write **invalidates** the consumer's copy of the entire line. The consumer has to re-fetch it via a coherence snoop. This is false sharing — the two cores aren't accessing the same data, but they're fighting over the same coherence unit.
+
+By making each slot exactly one cache line, every produce and consume is exactly one clean cache-line transfer. No false sharing. No wasted bandwidth. One write, one invalidation, one snoop — that's the minimum cost the protocol allows.
+
+## Why the raw pointer API matters
+
+The typical SPSC queue API looks something like `try_push(value: T)`. The caller constructs the value, then the queue copies it into the slot. Even if the compiler inlines everything, the value starts life on the stack and gets memcpy'd into the ring buffer. That's two writes to two different cache lines for every enqueue.
+
+Instead, the queue exposes a closure-based API:
+
+```rust
+queue.try_write_item(|ptr: *mut u8| {
+    // ptr points directly at the slot in the ring buffer
+    // writes here go straight into the cache line
+    unsafe {
+        std::ptr::copy_nonoverlapping(data.as_ptr(), ptr, 64);
+    }
+});
+```
+
+The caller gets a raw pointer to the slot. No intermediate buffer. The compiler sees through the closure, and `rustc` eliminated the stack copy entirely — the generated code wrote directly to the ring buffer slot with vectorised SSE stores (`movdqu`).
+
+This matters more than it might seem. When I compared the disassembly, `g++` failed to vectorise rigtorp's consumer summation loop — it emitted 16 scalar `add` instructions to sum the 64 bytes. `rustc`, with the closure API giving it full visibility into what was happening, emitted 4 SSE `paddd` instructions with `movdqa` loads. That difference alone accounted for roughly 2x in throughput.
+
+## Why the 512-slot pipeline matters
+
+If you run an SPSC queue with a buffer of 1 slot, every consumer read is a synchronous snoop — the consumer asks for a line that the producer just modified, and the coherence protocol has to transfer it on demand. The consumer stalls until the transfer completes.
+
+With 512 slots of headroom, the producer is writing far ahead of where the consumer is reading. The hardware prefetcher on the consumer's core sees a sequential access pattern through the ring buffer and starts pulling cache lines in advance of the actual reads. By the time the consumer reaches a given slot, the cache line is already sitting in its L1 cache.
+
+The `perf c2c` data confirms this: **69%** of sampled consumer loads were L1D hits. Only **0.2%** were HITM events (the consumer catching a line still Modified in the producer's cache — a synchronous snoop). The 512-slot pipeline turns what would be synchronous core-to-core transfers into asynchronous prefetched reads.
+
+## The rest of the design
+
+A few other decisions that contribute:
+
+The queue is backed by `mmap`'d memory, giving page-aligned allocation without the allocator's metadata overhead. Capacity is always a power of two, so index wrapping is a bitmask (`index & (capacity - 1)`) rather than a modulo. The producer caches the consumer's tail, and the consumer caches the producer's head — each core only issues an atomic load on the other's counter when its local cached copy says the queue is full (or empty). In steady state, where the queue is neither full nor empty, there are zero cross-core atomic reads per operation.
+
+## Benchmark results
+
+1 GiB transfer, 64-byte cache-line-aligned entries, cores pinned to separate physical cores, measured with criterion:
+
+| Queue | Throughput | ops/sec |
+|---|---|---|
+| kvell-rs | 21.9 GiB/s | ~367M |
+| rigtorp SPSCQueue (C++) | 9.6 GiB/s | ~161M |
+| ringbuf (Rust) | 7.1 GiB/s | ~119M |
+
+All results verified via disassembly — real loads, real stores, no elided reads or compiler tricks.
+
+## Latency is the real story
+
+21.9 GiB/s sounds impressive, but DRAM can push ~20 GB/s in a best-case streaming workload with a perfectly warmed prefetcher. The queue's throughput being comparable to DRAM bandwidth is respectable but it's not really the point.
+
+The real advantage is **latency**. An L1 cache hit costs ~1-4 ns. A DRAM access costs ~80-100 ns. The `perf c2c` data showed 69% of consumer loads hitting L1. The bandwidth number is a *consequence* of consistently low latency across millions of operations — it was never the design goal. If you're building a system where inter-core message passing is on the critical path (audio pipelines, trading systems, kernel bypass networking), the latency profile matters far more than the peak throughput number.
+
+## Confirming the binary and auditing the assembly
+
+Microbenchmarks lie. The compiler can elide reads, the benchmark framework can dominate runtime, and you can accidentally measure the wrong thing entirely. You have to verify the generated assembly before trusting any number.
+
+**Step 1: Build the benchmark binary without running it.**
+
+```bash
+cargo bench --bench spsc_throughput --no-run
+# prints: target/release/deps/spsc_throughput-0a375b62f17de04f
+```
+
+**Step 2: Find the hot loops.** `std::hint::spin_loop()` compiles to the x86 `pause` instruction. Search for those to locate the producer and consumer spin loops:
+
+```bash
+objdump -d -C --no-show-raw-insn <binary> | grep 'pause'
+```
+
+**Step 3: Dump the surrounding code.** The thread closures get inlined into `std::sys::backtrace::__rust_begin_short_backtrace` (Rust's thread entry point). Dump that function:
+
+```bash
+objdump -d -C --no-show-raw-insn <binary> \
+  | sed -n '/<__rust_begin_short_backtrace>:/,/^$/p'
+```
+
+There are multiple instances of this function (one per spawned thread), giving you both the producer and consumer loops.
+
+**Step 4: Read the assembly.** You're looking for:
+
+- **Producer:** Store instructions writing to the slot pointer (`movdqu`, `movdqa`, or `mov` to a register-indirect address like `(%rcx,%r8,1)`). All 64 bytes should be written.
+- **Consumer:** Load instructions reading from the slot pointer (`movdqa`, `paddd` with a memory operand). All 64 bytes should be loaded. If you only see atomic loads on head/tail with no data reads, the compiler elided your reads and your benchmark is lying to you.
+- **Loop bounds:** Look for `cmp $0x1000000, %rdx` (or whatever your iteration count is) to confirm the full count.
+
+### Benchmark pitfalls I hit
+
+| Mistake | Measured | Real | Why |
+|---|---|---|---|
+| `debug_assert` in release | 64 GiB/s | Fake | Assert compiled out, reads elided entirely |
+| `black_box` per `u32` | 17.6 GiB/s | Pessimistic | Killed auto-vectorisation, forced scalar adds |
+| `read_volatile` per page | 2 GiB/s | Wrong thing | Bypassed cache, measured DRAM bandwidth |
+| Checksum + `black_box` on result | 21.9 GiB/s | Correct | Real cached reads, compiler free to vectorise |
+
+The rule: if you can't find load/store instructions touching slot memory in the hot loop, the compiler optimised them away and your benchmark is fiction.
+
+## Examining cache utilisation
+
+**Step 0: Grant perf access to hardware counters.**
+
+```bash
+sudo setcap cap_perfmon,cap_sys_ptrace+ep /usr/bin/perf
+```
+
+**Step 1: Record cache-to-cache transfer data with `perf c2c`.**
+
+```bash
+perf c2c record -g <benchmark-binary> --bench "spsc/intercore"
+perf c2c report --stdio
+```
+
+Key numbers from the output header:
+
+```
+Load L1D hit        :  16134   (69%)
+Load Local HITM     :     46   (0.2%)
+Load Local DRAM     :     18   (0.08%)
+Store L1D Hit       :  53579   (99.7%)
+```
+
+What these mean:
+
+- **L1D hit (69%):** The cache line was already in the consumer's L1 when it tried to read. The prefetcher got there first.
+- **Local HITM (0.2%):** The consumer tried to read a line still Modified in the producer's L1 — a synchronous core-to-core snoop. With a 1-slot buffer this would dominate. With 512 slots, it's noise.
+- **Local DRAM (0.08%):** Actual main memory access. 18 total — almost certainly cold-start page faults, not steady-state operation.
+- **Store L1D Hit (99.7%):** The producer almost always writes to a line it already owns. No contention.
+
+Note: `perf c2c` uses sampling, not counting. The absolute numbers are a fraction of reality. The ratios are what matter.
+
+**Step 2: For exact counts, use `perf stat`.**
+
+```bash
+perf stat -e mem_load_l3_hit_retired.xsnp_hitm,\
+mem_load_retired.l1_hit,\
+mem_load_retired.l2_hit,\
+mem_load_retired.l3_hit \
+    <benchmark-binary> --bench "spsc/intercore"
+```
+
+**Step 3: For pipeline stalls, use Intel's Top-Down analysis.**
+
+```bash
+perf stat -M TopdownL1 <benchmark-binary> --bench "spsc/intercore"
+```
+
+This breaks CPU cycles into Frontend Bound, Backend Bound, Bad Speculation, and Retiring — tells you whether the bottleneck is instruction fetch, memory, branch mispredicts, or useful work.
+
+**Step 4: For per-instruction hotspots, use `perf annotate`.**
+
+```bash
+perf record -g <benchmark-binary> --bench "spsc/intercore"
+perf annotate --stdio --symbol='std::sys::backtrace::__rust_begin_short_backtrace'
+```
+
+This shows the percentage of time spent on each instruction. In our case, the hottest instruction (9.05%) was the consumer loading the producer's head atomic — the actual coherence protocol transfer. The data reads (`movdqa`/`paddd`) were spread at ~5-6% each, showing no single bottleneck.
+
+## What's novel
+
+None of the individual techniques here are new. Cache-line-sized slots, power-of-two masking, cached indices, mmap backing, raw pointer APIs — all known. But I haven't found an existing library or writeup that combines all six into a single design and then verifies the result end-to-end with `perf c2c` and disassembly.
+
+The closest structural analogue is io_uring: 64-byte SQEs, mmap'd shared memory, raw pointers, power-of-two ring. The closest philosophical treatment is <a href="https://psy-lob-saw.blogspot.com/" target="_blank" rel="noreferrer noopener">Nitsan Wakart's blog</a> on mechanical sympathy and sparse SPSC queues. The most rigorous academic analysis is from <a href="https://doi.org/10.1002/spe.2753" target="_blank" rel="noreferrer noopener">Maffione et al. (SPE 2019)</a>, which provides detailed coherence-level analysis of SPSC queue behaviour.
+
+## Why SPMC is hard from here
+
+The entire design relies on each atomic variable having exactly one writer. The head counter is only written by the producer. The tail counter is only written by the consumer. There is never contention on either.
+
+SPMC (single-producer, multiple-consumer) breaks this assumption. Multiple consumers have to contend on the tail counter via compare-and-swap. What was a one-writer atomic becomes a hot contended cache line bouncing between consumer cores. The "coherence as message bus" degrades into a contention bus.
+
+The way to preserve these properties at scale is sharded SPSC: allocate N queues (one per consumer), have the producer round-robin across them. Each individual queue retains the single-writer invariant, the coherence protocol does its thing, and you get linear scaling with consumer count.
