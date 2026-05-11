@@ -16,9 +16,10 @@ export function mergeVectorClocks(
   const allIds = new Set<number>();
   for (const k of Object.keys(self)) allIds.add(Number(k));
   for (const k of Object.keys(received)) allIds.add(Number(k));
+  allIds.add(selfId);
   for (const id of allIds) {
     result[id] = Math.max(self[id] ?? 0, received[id] ?? 0);
   }
-  result[selfId] = (result[selfId] ?? 0) + 1;
+  result[selfId] = result[selfId] + 1;
   return result;
 }
