@@ -8,7 +8,13 @@ type ClockProps = {
   id: number;
   colour: string;
   deltas: Record<number, number>;
-  dispatch: (action: { type: string; id?: number; delta?: number }) => void;
+  syncing?: boolean;
+  dispatch: (action: {
+    type: string;
+    id?: number;
+    delta?: number;
+    value?: number;
+  }) => void;
 };
 
 export default function Clock(props: ClockProps) {
@@ -18,6 +24,7 @@ export default function Clock(props: ClockProps) {
 
   onMount(() => {
     props.dispatch({ type: 'UPDATE_DELTA', id: props.id, delta: 0 });
+    props.dispatch({ type: 'REPORT_COUNTER', id: props.id, value: 0 });
 
     const tickId = setInterval(() => {
       const delta = props.deltas[props.id];
@@ -27,7 +34,9 @@ export default function Clock(props: ClockProps) {
         setTimeout(() => setDeltaLocal(0), 300);
         props.dispatch({ type: 'RESET_DELTA', id: props.id });
       }
-      setCounter((c) => c + 1);
+      const next = counter() + 1;
+      setCounter(next);
+      props.dispatch({ type: 'REPORT_COUNTER', id: props.id, value: next });
     }, interval);
 
     onCleanup(() => clearInterval(tickId));
@@ -49,6 +58,11 @@ export default function Clock(props: ClockProps) {
           justify-content: center;
           align-items: center;
           border-radius: 50%;
+          transition: box-shadow 0.2s ease;
+        }
+        .circle_${props.colour}.syncing {
+          box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.8),
+                      0 0 0 10px rgba(0, 0, 0, 0.4);
         }
         .circle_container {
           display: flex;
@@ -60,7 +74,11 @@ export default function Clock(props: ClockProps) {
         }
       `}</style>
       <div class="circle_container">
-        <div class={`circle_${props.colour}`}>{counter()}</div>
+        <div
+          class={`circle_${props.colour}${props.syncing ? ' syncing' : ''}`}
+        >
+          {counter()}
+        </div>
         {deltaLocal() !== 0 && <div class="delta_local">{showText()}</div>}
       </div>
     </>
