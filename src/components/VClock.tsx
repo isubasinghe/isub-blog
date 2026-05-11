@@ -45,7 +45,9 @@ function createVClock(id: number, initial: number) {
     setTimeout(() => setFlash(false), 400);
   };
 
-  const sendUpdate = (receiveFn: Function) => {
+  const sendUpdate = (
+    receiveFn: (state: number, vclocks: Record<number, Value>) => void,
+  ) => {
     setClocks(id, 'counter', (c) => c + 1);
     receiveFn(clocks[id].state, { ...clocks });
   };
