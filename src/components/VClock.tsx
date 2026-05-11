@@ -1,5 +1,6 @@
 import { createStore } from 'solid-js/store';
-import { For, Show } from 'solid-js';
+import { createSignal, For, Show } from 'solid-js';
+import { mergeVectorClocks } from '../lib/clock/vector';
 
 type Value = {
   counter: number;
@@ -10,13 +11,37 @@ function createVClock(id: number, initial: number) {
   const [clocks, setClocks] = createStore<Record<number, Value>>({
     [id]: { state: initial, counter: 0 },
   });
+  const [flash, setFlash] = createSignal(false);
 
   const updateSelf = (newState: number) => {
     setClocks(id, { state: newState, counter: (clocks[id]?.counter ?? 0) + 1 });
   };
 
-  const receiveUpdate = (_newState: number, _vclocks: Record<number, Value>) => {
-    // placeholder for receive logic
+  const receiveUpdate = (_newState: number, vclocks: Record<number, Value>) => {
+    // Project the rich store down to a flat vector for the pure merge,
+    // then write each component back.
+    const selfFlat: Record<number, number> = {};
+    for (const k of Object.keys(clocks)) {
+      selfFlat[Number(k)] = clocks[Number(k)].counter;
+    }
+    const receivedFlat: Record<number, number> = {};
+    for (const k of Object.keys(vclocks)) {
+      receivedFlat[Number(k)] = vclocks[Number(k)].counter;
+    }
+
+    const merged = mergeVectorClocks(selfFlat, receivedFlat, id);
+
+    for (const k of Object.keys(merged)) {
+      const key = Number(k);
+      if (clocks[key]) {
+        setClocks(key, 'counter', merged[key]);
+      } else {
+        setClocks(key, { state: 0, counter: merged[key] });
+      }
+    }
+
+    setFlash(true);
+    setTimeout(() => setFlash(false), 400);
   };
 
   const sendUpdate = (receiveFn: Function) => {
@@ -24,7 +49,7 @@ function createVClock(id: number, initial: number) {
     receiveFn(clocks[id].state, { ...clocks });
   };
 
-  return { clocks, updateSelf, receiveUpdate, sendUpdate };
+  return { id, clocks, flash, updateSelf, receiveUpdate, sendUpdate };
 }
 
 export default function VClockMan() {
@@ -55,6 +80,10 @@ export default function VClockMan() {
         tr:nth-child(even) {
           background-color: #dddddd;
         }
+        tr.flash td {
+          background-color: #fff3a3;
+          transition: background-color 0.4s ease;
+        }
         .buttons {
           display: flex;
           justify-content: space-around;
@@ -73,7 +102,7 @@ export default function VClockMan() {
           </tr>
         </thead>
         <tbody>
-          <tr>
+          <tr class={clock0.flash() ? 'flash' : ''}>
             <td>{clock0.clocks[0].state}</td>
             <For each={Object.keys(clock0.clocks)}>{(k) =>
               <td>{clock0.clocks[Number(k)].counter}</td>
@@ -100,7 +129,7 @@ export default function VClockMan() {
           </tr>
         </thead>
         <tbody>
-          <tr>
+          <tr class={clock1.flash() ? 'flash' : ''}>
             <td>{clock1.clocks[1].state}</td>
             <For each={Object.keys(clock1.clocks)}>{(k) =>
               <td>{clock1.clocks[Number(k)].counter}</td>
