@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup } from 'solid-js';
+import { For, createSignal, onMount, onCleanup } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import Clock from './Clock.tsx';
 import { computeBerkeleyDeltas } from '../../lib/clock/berkeley';
@@ -77,9 +77,11 @@ export default function BerkeleyClockSync() {
         />
       </div>
       <div class="clocks">
-        <Clock id={1} colour="yellow" deltas={state.deltas} dispatch={dispatch} />
-        <Clock id={2} colour="yellow" deltas={state.deltas} dispatch={dispatch} />
-        <Clock id={3} colour="yellow" deltas={state.deltas} dispatch={dispatch} />
+        <For each={SLAVE_IDS}>
+          {(id) => (
+            <Clock id={id} colour="yellow" deltas={state.deltas} dispatch={dispatch} />
+          )}
+        </For>
       </div>
     </>
   );
