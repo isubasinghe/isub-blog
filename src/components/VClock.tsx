@@ -17,6 +17,7 @@ function createVClock(id: number, initial: number) {
     setClocks(id, { state: newState, counter: (clocks[id]?.counter ?? 0) + 1 });
   };
 
+  // _newState is intentionally unused: per spec, receiver does not adopt sender's state.
   const receiveUpdate = (_newState: number, vclocks: Record<number, Value>) => {
     // Project the rich store down to a flat vector for the pure merge,
     // then write each component back.
@@ -76,13 +77,13 @@ export default function VClockMan() {
           border: 1px solid #dddddd;
           text-align: left;
           padding: 8px;
+          transition: background-color 0.4s ease;
         }
         tr:nth-child(even) {
           background-color: #dddddd;
         }
         tr.flash td {
           background-color: #fff3a3;
-          transition: background-color 0.4s ease;
         }
         .buttons {
           display: flex;
