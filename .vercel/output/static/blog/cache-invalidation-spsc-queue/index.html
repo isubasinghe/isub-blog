@@ -1,8 +1,7 @@
-<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Cache Invalidation Makes Your Code Fast: Building a 21.9 GiB/s SPSC Queue</title><meta name="description" content="Building a high-throughput SPSC queue by treating the cache coherence protocol as the transport layer"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.wiki-link.broken{color:#b00020;text-decoration:underline dotted #b00020;cursor:help}.wiki-breadcrumbs{font-size:.95rem;margin-bottom:1rem;color:#555}.wiki-breadcrumbs a{font-size:.95rem}.wiki-children,.wiki-siblings,.wiki-backlinks{margin-top:2.5rem;border-top:1px solid #ddd;padding-top:1rem}.wiki-children h2,.wiki-siblings h2,.wiki-backlinks h2{font-size:1rem;color:#666;margin-bottom:.5rem;font-weight:400;text-transform:uppercase;letter-spacing:.05em}#wiki-graph{width:100%;height:70vh;border:1px solid #ddd;border-radius:4px}.container[data-astro-cid-37fxchfa]{max-width:56rem;margin:0 auto;margin-top:2rem;padding:0 1.5rem}
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Cache Invalidation Makes Your Code Fast: Building an SPSC Queue</title><meta name="description" content="Building a high-throughput SPSC queue by treating the cache coherence protocol as the transport layer"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.wiki-link.broken{color:#b00020;text-decoration:underline dotted #b00020;cursor:help}.wiki-breadcrumbs{font-size:.95rem;margin-bottom:1rem;color:#555}.wiki-breadcrumbs a{font-size:.95rem}.wiki-children,.wiki-siblings,.wiki-backlinks{margin-top:2.5rem;border-top:1px solid #ddd;padding-top:1rem}.wiki-children h2,.wiki-siblings h2,.wiki-backlinks h2{font-size:1rem;color:#666;margin-bottom:.5rem;font-weight:400;text-transform:uppercase;letter-spacing:.05em}#wiki-graph{width:100%;height:70vh;border:1px solid #ddd;border-radius:4px}.container[data-astro-cid-37fxchfa]{max-width:56rem;margin:0 auto;margin-top:2rem;padding:0 1.5rem}
 a[data-astro-cid-g5kbnxd7]{text-decoration:none}
 .date[data-astro-cid-7jjqptxk]{margin-top:20px;text-decoration:underline;display:flex;justify-content:flex-end}a[data-astro-cid-7jjqptxk]{font-size:1rem}
-</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <a href="/blog" data-astro-cid-g5kbnxd7>&lt;</a>  <div class="date" data-astro-cid-7jjqptxk>Published Date: 2026-4-13</div><h1 id="cache-invalidation-makes-your-code-fast-building-a-219-gibs-spsc-queue">Cache Invalidation Makes Your Code Fast: Building a 21.9 GiB/s SPSC queue.</h1>
-<h3 id="78561-sampled-memory-operations-18-hit-dram-the-rest-never-left-cache">78,561 sampled memory operations. 18 hit DRAM. The rest never left cache.</h3>
+</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <a href="/blog" data-astro-cid-g5kbnxd7>&lt;</a>  <div class="date" data-astro-cid-7jjqptxk>Published Date: 2026-4-13</div><h1 id="cache-invalidation-makes-your-code-fast-building-an-spsc-queue">Cache Invalidation Makes Your Code Fast: Building an SPSC queue.</h1>
 <p>Cache invalidation is normally seen as a bad thing, but this doesn’t always have to be the case. There are ways in which you can (ab)use the cache coherency protocol to get data transfer over the memory fabric itself.</p>
 <p>As a part of my yak shaving for my key value database named <a href="https://github.com/isubasinghe/kvellox" target="_blank" rel="noreferrer noopener">kvell</a>, I built a stupidly fast spsc queue over a ring buffer.</p>
 <p>The implementation focussed on achieving:</p>
@@ -214,7 +213,7 @@ to operate on. A single DRAM operation can cost as much as 500 instructions, sta
 absolutely destroy performance.</p>
 <p>What if we can use this knowledge to build a super data transfer mechanism? One that hardly touches DRAM and use the interconnect as a stupid fast inter-core communication data bus?</p>
 <h3 id="the-core-insight">The core insight</h3>
-<p>If we make a 512-slot ring buffer where each slot is exactly 64 bytes (one cache line), the entire working set is 32 KB. That fits in L1. When I ran <code>perf c2c</code> on the benchmark, only 18 out of 78,561 sampled memory operations hit DRAM. Those 18 were cold start page faults. After warmup, the working set never leaves cache. The lines just bounce between cores, carried by the coherence protocol, never touching main memory.</p>
+<p>If we make a 512-slot ring buffer where each slot is exactly 64 bytes (one cache line), the entire working set is 32 KB. That fits in L1. After warmup, the working set never leaves cache. The lines just bounce between cores, carried by the coherence protocol, never touching main memory.</p>
 <p>So the coherence protocol isn’t something we have to work around. It is the transport layer. We’re using the interconnect as a core-to-core message bus.</p>
 <h3 id="why-cache-line-sized-slots-matter">Why cache line sized slots matter.</h3>
 <p>Most SPSC queues treat slot size as whatever <code>sizeof(T)</code> happens to be. Nobody really thinks about it.</p>
@@ -761,17 +760,4 @@ absolutely destroy performance.</p>
 <h3 id="benchmark-results">Benchmark results</h3>
 <h3 id="latency-is-the-real-highlight">Latency is the real highlight</h3>
 <h3 id="confirming-the-binary-and-auditing-the-assembly">Confirming the binary and auditing the assembly.</h3>
-<h3 id="examining-the-cache-utilisation">Examining the cache utilisation</h3>
-<p>Key numbers from the output header:</p>
-<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8;overflow-x:auto" tabindex="0" data-language="plaintext"><code><span class="line"><span>Load L1D hit        :  16134   (69%)</span></span>
-<span class="line"><span>Load Local HITM     :     46   (0.2%)</span></span>
-<span class="line"><span>Load Local DRAM     :     18   (0.08%)</span></span>
-<span class="line"><span>Store L1D Hit       :  53579   (99.7%)</span></span></code></pre>
-<p>What these mean:</p>
-<ul>
-<li><strong>L1D hit (69%):</strong> The cache line was already in the consumer’s L1 when it tried to read. The prefetcher got there first.</li>
-<li><strong>Local HITM (0.2%):</strong> The consumer tried to read a line still Modified in the producer’s L1 — a synchronous core-to-core snoop. With a 1-slot buffer this would dominate. With 512 slots, it’s noise.</li>
-<li><strong>Local DRAM (0.08%):</strong> Actual main memory access. 18 total — almost certainly cold-start page faults, not steady-state operation.</li>
-<li><strong>Store L1D Hit (99.7%):</strong> The producer almost always writes to a line it already owns. No contention.</li>
-</ul>
-<p>Note: <code>perf c2c</code> uses sampling, not counting. The absolute numbers are a fraction of reality. The ratios are what matter.</p>  </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>   
+<h3 id="examining-the-cache-utilisation">Examining the cache utilisation</h3>  </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>   

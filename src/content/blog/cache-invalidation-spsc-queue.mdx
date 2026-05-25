@@ -1,5 +1,5 @@
 ---
-title: "Cache Invalidation Makes Your Code Fast: Building a 21.9 GiB/s SPSC Queue"
+title: "Cache Invalidation Makes Your Code Fast: Building an SPSC Queue"
 path: cache-invalidation-spsc-queue
 description: Building a high-throughput SPSC queue by treating the cache coherence protocol as the transport layer
 date: 2026-4-13
@@ -9,9 +9,7 @@ import RingBufferAnimation from '../../components/RingBufferAnimation.tsx';
 import RingBufferCachedAnimation from '../../components/RingBufferCachedAnimation.tsx';
 import AtomicOpsCalculator from '../../components/AtomicOpsCalculator.tsx';
 
-# Cache Invalidation Makes Your Code Fast: Building a 21.9 GiB/s SPSC queue.
-
-### 78,561 sampled memory operations. 18 hit DRAM. The rest never left cache.
+# Cache Invalidation Makes Your Code Fast: Building an SPSC queue.
 
 Cache invalidation is normally seen as a bad thing, but this doesn't always have to be the case. There are ways in which you can (ab)use the cache coherency protocol to get data transfer over the memory fabric itself.
 
@@ -52,7 +50,7 @@ What if we can use this knowledge to build a super data transfer mechanism? One 
 
 ### The core insight
 
-If we make a 512-slot ring buffer where each slot is exactly 64 bytes (one cache line), the entire working set is 32 KB. That fits in L1. When I ran `perf c2c` on the benchmark, only 18 out of 78,561 sampled memory operations hit DRAM. Those 18 were cold start page faults. After warmup, the working set never leaves cache. The lines just bounce between cores, carried by the coherence protocol, never touching main memory.
+If we make a 512-slot ring buffer where each slot is exactly 64 bytes (one cache line), the entire working set is 32 KB. That fits in L1. After warmup, the working set never leaves cache. The lines just bounce between cores, carried by the coherence protocol, never touching main memory.
 
 So the coherence protocol isn't something we have to work around. It is the transport layer. We're using the interconnect as a core-to-core message bus.
 
@@ -109,21 +107,3 @@ Play around with the calculator below. Crank the buffer capacity up to 512 and w
 
 
 ### Examining the cache utilisation
-
-Key numbers from the output header:
-
-```
-Load L1D hit        :  16134   (69%)
-Load Local HITM     :     46   (0.2%)
-Load Local DRAM     :     18   (0.08%)
-Store L1D Hit       :  53579   (99.7%)
-```
-
-What these mean:
-
-- **L1D hit (69%):** The cache line was already in the consumer's L1 when it tried to read. The prefetcher got there first.
-- **Local HITM (0.2%):** The consumer tried to read a line still Modified in the producer's L1 — a synchronous core-to-core snoop. With a 1-slot buffer this would dominate. With 512 slots, it's noise.
-- **Local DRAM (0.08%):** Actual main memory access. 18 total — almost certainly cold-start page faults, not steady-state operation.
-- **Store L1D Hit (99.7%):** The producer almost always writes to a line it already owns. No contention.
-
-Note: `perf c2c` uses sampling, not counting. The absolute numbers are a fraction of reality. The ratios are what matter.
