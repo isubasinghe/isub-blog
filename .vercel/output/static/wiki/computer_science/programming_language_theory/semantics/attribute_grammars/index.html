@@ -2,7 +2,16 @@
 .sep[data-astro-cid-qo2a4o5t]{color:#999;padding:0 .25rem}
 ul[data-astro-cid-btyu5urm]{list-style:none;padding:0}li[data-astro-cid-btyu5urm]{padding:.25rem 0}ul[data-astro-cid-4bqwb3ux]{list-style:none;padding:0}li[data-astro-cid-4bqwb3ux]{padding:.25rem 0}
 ul[data-astro-cid-tr45z6hg]{list-style:none;padding:0}li[data-astro-cid-tr45z6hg]{padding:.35rem 0}.desc[data-astro-cid-tr45z6hg]{color:#666;font-size:.95rem}
-</style><script type="module" src="/_astro/page.DGRhADao.js"></script></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <nav class="wiki-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-qo2a4o5t> <a href="/" data-astro-cid-qo2a4o5t>Home</a>  <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki" data-astro-cid-qo2a4o5t>Wiki</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science" data-astro-cid-qo2a4o5t>computer_science</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science/programming_language_theory" data-astro-cid-qo2a4o5t>programming_language_theory</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science/programming_language_theory/semantics" data-astro-cid-qo2a4o5t>semantics</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <span data-astro-cid-qo2a4o5t>attribute_grammars</span> </nav>  <h1>Attribute grammars</h1> <ol>
+</style><script type="module" src="/_astro/page.DGRhADao.js"></script></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <nav class="wiki-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-qo2a4o5t> <a href="/" data-astro-cid-qo2a4o5t>Home</a>  <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki" data-astro-cid-qo2a4o5t>Wiki</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science" data-astro-cid-qo2a4o5t>computer_science</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science/programming_language_theory" data-astro-cid-qo2a4o5t>programming_language_theory</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science/programming_language_theory/semantics" data-astro-cid-qo2a4o5t>semantics</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <span data-astro-cid-qo2a4o5t>attribute_grammars</span> </nav>  <h1>Attribute grammars</h1> <h2 id="basic-idea">Basic idea</h2>
+<p>Augment a CFG by attaching <em>attributes</em> to grammar symbols and <em>semantic rules</em> that compute them. A clean way to fold static analysis (type checking, scope resolution) directly into parsing.</p>
+<h2 id="key-facts">Key facts</h2>
+<ul>
+<li><em>Synthesised</em> attributes flow up from children to parent.</li>
+<li><em>Inherited</em> attributes flow down from parent / siblings.</li>
+<li>S-attributed: only synthesised — evaluable in one bottom-up pass (yacc-friendly).</li>
+<li>L-attributed: synthesised + inherited-from-left-siblings — evaluable in one left-to-right pass (LL-friendly).</li>
+</ul>
+<ol>
 <li>S-attributed grammars</li>
 <li>L-attributed grammars</li>
 </ol>    </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>  
