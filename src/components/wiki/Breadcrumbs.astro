@@ -1,0 +1,28 @@
+---
+import { breadcrumbs } from '../../lib/wiki/paths';
+
+interface Props {
+  /** Wiki entry id (e.g. "concurrency/atomic-ops" or "index"). */
+  id: string;
+}
+
+const { id } = Astro.props;
+const crumbs = breadcrumbs(id);
+---
+
+<nav class="wiki-breadcrumbs" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  {crumbs.map((c) => (
+    <>
+      <span class="sep"> › </span>
+      {c.current ? <span>{c.label}</span> : <a href={c.url}>{c.label}</a>}
+    </>
+  ))}
+</nav>
+
+<style>
+  .sep {
+    color: #999;
+    padding: 0 0.25rem;
+  }
+</style>

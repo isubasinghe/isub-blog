@@ -1,0 +1,31 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { entryToUrl, displayTitle } from '../../lib/wiki/graph';
+
+interface Props {
+  entries: CollectionEntry<'wiki'>[];
+}
+
+const { entries } = Astro.props;
+---
+
+{entries.length > 0 && (
+  <section class="wiki-backlinks">
+    <h2>Linked from</h2>
+    <ul>
+      {entries.map((e) => (
+        <li><a href={entryToUrl(e.id)}>{displayTitle(e)}</a></li>
+      ))}
+    </ul>
+  </section>
+)}
+
+<style>
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+  li {
+    padding: 0.25rem 0;
+  }
+</style>

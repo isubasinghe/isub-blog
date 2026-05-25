@@ -1,0 +1,53 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/wiki/Breadcrumbs.astro';
+import SiblingList from '../../components/wiki/SiblingList.astro';
+import ChildList from '../../components/wiki/ChildList.astro';
+import Backlinks from '../../components/wiki/Backlinks.astro';
+import {
+  buildLinkIndex,
+  backlinksFor,
+  entryToUrl,
+  displayTitle,
+} from '../../lib/wiki/graph';
+import { folderIdOf, isFolderIndex } from '../../lib/wiki/paths';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('wiki');
+  const index = buildLinkIndex(entries);
+
+  return entries
+    // Root landing is handled by index.astro — skip whichever convention the
+    // source uses for the root (Astro lowercases ids).
+    .filter((e) => !/^(?:index|readme)$/i.test(e.id))
+    .map((e) => {
+      const url = entryToUrl(e.id); // "/wiki/concurrency" or "/wiki/foo/bar"
+      const slug = url.replace(/^\/wiki\//, '');
+      return {
+        params: { slug },
+        props: {
+          entry: e,
+          allEntries: entries,
+          backlinks: backlinksFor(e.id, index, entries),
+        },
+      };
+    });
+}
+
+const { entry, allEntries, backlinks } = Astro.props;
+const { Content } = await render(entry);
+const title = displayTitle(entry);
+const description = entry.data.description || `Isitha's wiki — ${title}`;
+const folderId = folderIdOf(entry.id);
+const showChildren = isFolderIndex(entry.id);
+---
+
+<BaseLayout title={title} description={description}>
+  <Breadcrumbs id={entry.id} />
+  <h1>{title}</h1>
+  <Content />
+  {showChildren && <ChildList parentId={folderId} entries={allEntries} />}
+  <SiblingList id={entry.id} entries={allEntries} />
+  <Backlinks entries={backlinks} />
+</BaseLayout>

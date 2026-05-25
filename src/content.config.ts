@@ -21,4 +21,28 @@ const projects = defineCollection({
   }),
 });
 
-export const collections = { blog, projects };
+const wiki = defineCollection({
+  loader: glob({
+    pattern: [
+      '**/*.{md,mdx}',
+      // Knowledge-submodule cruft we don't publish.
+      '!.gitbook/**',
+      '!_layouts/**',
+      '!_config.yml',
+      '!assets/**',
+      '!logseq/**',
+      '!journals/**',
+      '!pages/**',
+      '!SUMMARY.md',
+      '!.vscode/**',
+    ],
+    base: './src/content/wiki',
+  }),
+  schema: z.object({
+    title: z.string().optional(),
+    description: z.string().nullable().optional().default('').transform(v => v ?? ''),
+    tags: z.array(z.string()).optional().default([]),
+  }),
+});
+
+export const collections = { blog, projects, wiki };

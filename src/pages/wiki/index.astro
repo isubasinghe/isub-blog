@@ -1,0 +1,32 @@
+---
+import { getCollection, getEntry, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Nav from '../../components/Nav.astro';
+import ChildList from '../../components/wiki/ChildList.astro';
+import { displayTitle } from '../../lib/wiki/graph';
+
+// The wiki root may live as either `index.md` (our convention) or `README.md`
+// (the Knowledge submodule convention). Astro normalizes ids to lowercase.
+const root = (await getEntry('wiki', 'readme')) ?? (await getEntry('wiki', 'index'));
+const entries = await getCollection('wiki');
+const description = root?.data.description || "Isitha's wiki — personal knowledge index";
+
+let Content: any = null;
+if (root) {
+  const rendered = await render(root);
+  Content = rendered.Content;
+}
+
+const title = root ? displayTitle(root) : 'Wiki';
+const parentId = root?.id ?? 'index';
+---
+
+<BaseLayout title="Wiki" description={description}>
+  <h1>{title}</h1>
+  <Nav />
+  {Content && <Content />}
+  <ChildList parentId={parentId} entries={entries} />
+  <p style="margin-top: 2rem;">
+    <a href="/wiki/graph">View link graph →</a>
+  </p>
+</BaseLayout>

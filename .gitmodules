@@ -1,0 +1,3 @@
+[submodule "src/content/wiki"]
+	path = src/content/wiki
+	url = git@github.com:isubasinghe/Knowledge.git

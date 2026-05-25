@@ -1,0 +1,36 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { siblingsOf } from '../../lib/wiki/paths';
+import { entryToUrl, displayTitle } from '../../lib/wiki/graph';
+
+interface Props {
+  id: string;
+  entries: CollectionEntry<'wiki'>[];
+}
+
+const { id, entries } = Astro.props;
+const siblings = siblingsOf(id, entries).sort((a, b) =>
+  displayTitle(a).localeCompare(displayTitle(b))
+);
+---
+
+{siblings.length > 0 && (
+  <section class="wiki-siblings">
+    <h2>Siblings</h2>
+    <ul>
+      {siblings.map((s) => (
+        <li><a href={entryToUrl(s.id)}>{displayTitle(s)}</a></li>
+      ))}
+    </ul>
+  </section>
+)}
+
+<style>
+  ul {
+    list-style: none;
+    padding: 0;
+  }
+  li {
+    padding: 0.25rem 0;
+  }
+</style>
