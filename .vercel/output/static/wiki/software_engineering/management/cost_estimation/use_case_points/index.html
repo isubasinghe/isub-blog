@@ -1,0 +1,91 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Use case points (UCP)</title><meta name="description" content="Isitha's wiki — Use case points (UCP)"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.wiki-link.broken{color:#b00020;text-decoration:underline dotted #b00020;cursor:help}.wiki-breadcrumbs{font-size:.95rem;margin-bottom:1rem;color:#555}.wiki-breadcrumbs a{font-size:.95rem}.wiki-children,.wiki-siblings,.wiki-backlinks{margin-top:2.5rem;border-top:1px solid #ddd;padding-top:1rem}.wiki-children h2,.wiki-siblings h2,.wiki-backlinks h2{font-size:1rem;color:#666;margin-bottom:.5rem;font-weight:400;text-transform:uppercase;letter-spacing:.05em}#wiki-graph{width:100%;height:70vh;border:1px solid #ddd;border-radius:4px}.container[data-astro-cid-37fxchfa]{max-width:56rem;margin:0 auto;margin-top:2rem;padding:0 1.5rem}
+.sep[data-astro-cid-qo2a4o5t]{color:#999;padding:0 .25rem}
+ul[data-astro-cid-btyu5urm]{list-style:none;padding:0}li[data-astro-cid-btyu5urm]{padding:.25rem 0}ul[data-astro-cid-4bqwb3ux]{list-style:none;padding:0}li[data-astro-cid-4bqwb3ux]{padding:.25rem 0}
+ul[data-astro-cid-tr45z6hg]{list-style:none;padding:0}li[data-astro-cid-tr45z6hg]{padding:.35rem 0}.desc[data-astro-cid-tr45z6hg]{color:#666;font-size:.95rem}
+</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <nav class="wiki-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-qo2a4o5t> <a href="/" data-astro-cid-qo2a4o5t>Home</a>  <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki" data-astro-cid-qo2a4o5t>Wiki</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/software_engineering" data-astro-cid-qo2a4o5t>software_engineering</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/software_engineering/management" data-astro-cid-qo2a4o5t>management</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/software_engineering/management/cost_estimation" data-astro-cid-qo2a4o5t>cost_estimation</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <span data-astro-cid-qo2a4o5t>use_case_points</span> </nav>  <h1>Use case points (UCP)</h1> <p>Is a software estimation technique used the measure the software size with Use cases Developed in 1993 for sizing and estimating projects using OO methodology The concept of UCP is similar to FP</p>
+<p>Use cases describe the functionality of the system Use cases model the dialog between the actors and the system Primary purpose is to document functional requirements but also used for testing purposes</p>
+<ol>
+<li>Compute unadjusted use case weight (UUCW)</li>
+<li>Compute unadjusted actor weight (UAW)</li>
+<li>Compute technical complexity factor (TCF)</li>
+<li>Compute environmental complexity factor (ECF)</li>
+<li>Compute the final size estimate</li>
+</ol>
+<h2 id="compute-uucw">Compute UUCW</h2>
+<p>Count the number of simple, average, complex use cases based on the number of transactions as per table below.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th align="center">Use case classification</th><th>Type of actor</th><th>Weight</th></tr></thead><tbody><tr><td align="center">Simple</td><td>1 to 3 transactions</td><td>5</td></tr><tr><td align="center">Average</td><td>4 to 7</td><td>10</td></tr><tr><td align="center">Complex</td><td>8 or more</td><td>15</td></tr></tbody></table>
+<p>UUCW = N_s <em>5 + N_a</em> 10 + N_c * 15</p>
+<h2 id="compute-uaw">Compute UAW</h2>
+<p>Count the number of simple, average, complex actors</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th align="center">Actor classification</th><th>Type of Actor</th><th>Weight</th></tr></thead><tbody><tr><td align="center">Simple</td><td>External system interacting using a well defined API</td><td>1</td></tr><tr><td align="center">Average</td><td>External system using a standard protocol</td><td>2</td></tr><tr><td align="center">Complex</td><td>Human actor using GUI</td><td>3</td></tr></tbody></table>
+<p>UAW = N_s <em>1 + N_a</em> 2 + N_c * 3</p>
+<h2 id="compute-tcf">Compute TCF</h2>
+<p><img alt="TCF" loading="lazy" decoding="async" fetchpriority="auto" width="1160" height="704" src="/_astro/tcf%20(2)%20(2).B0x2XeHo_Z1bFXzP.webp" ></p>
+<h2 id="compute-ecf">Compute ECF</h2>
+<p><img alt="ECF" loading="lazy" decoding="async" fetchpriority="auto" width="1162" height="683" src="/_astro/ecf%20(2)%20(2).BtZGYHlj_28HLVe.webp" ></p>
+<h2 id="compute-final-ucp">Compute final UCP</h2>
+<p>UCP = (UUCW + UAW) <em>TCF</em> ECF</p>
+<h2 id="advantages-of-ucp">Advantages of UCP</h2>
+<ul>
+<li>UCP are based on use cases and can be measured very early in the project life cycle</li>
+<li>UCP based estimates are found to be close to actuals when estimation is performed by experienced people</li>
+<li>UCPs are easy to use and do not call for additional analysis</li>
+<li>Use cases are being used vastly as a method of choice to describe requirements</li>
+</ul>
+<h2 id="disadvantages-of-ucp">Disadvantages of UCP</h2>
+<ul>
+<li>UCP can be used only when requirements are written in the form of use cases</li>
+<li>Dependant on goal oriented, well written use cases</li>
+<li>Technical and environmental factors have high impact on UCP</li>
+<li>Not as well established as FPs</li>
+</ul> <section class="wiki-siblings" data-astro-cid-btyu5urm><h2 data-astro-cid-btyu5urm>Siblings</h2><ul data-astro-cid-btyu5urm><li data-astro-cid-btyu5urm><a href="/wiki/software_engineering/management/cost_estimation/challenges" data-astro-cid-btyu5urm>Challenges in cost estimation.</a></li><li data-astro-cid-btyu5urm><a href="/wiki/software_engineering/management/cost_estimation/cocomo" data-astro-cid-btyu5urm>cocomo</a></li><li data-astro-cid-btyu5urm><a href="/wiki/software_engineering/management/cost_estimation/cost_estimation" data-astro-cid-btyu5urm>Cost Estimation</a></li><li data-astro-cid-btyu5urm><a href="/wiki/software_engineering/management/cost_estimation/function_points" data-astro-cid-btyu5urm>Function Points</a></li><li data-astro-cid-btyu5urm><a href="/wiki/software_engineering/management/cost_estimation/size_estimation" data-astro-cid-btyu5urm>Size Estimation</a></li><li data-astro-cid-btyu5urm><a href="/wiki/software_engineering/management/cost_estimation/techniques" data-astro-cid-btyu5urm>Techniques for cost estimation</a></li></ul></section>   </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>  

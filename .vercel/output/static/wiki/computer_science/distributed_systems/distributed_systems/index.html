@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Distributed Systems</title><meta name="description" content="Isitha's wiki — Distributed Systems"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.wiki-link.broken{color:#b00020;text-decoration:underline dotted #b00020;cursor:help}.wiki-breadcrumbs{font-size:.95rem;margin-bottom:1rem;color:#555}.wiki-breadcrumbs a{font-size:.95rem}.wiki-children,.wiki-siblings,.wiki-backlinks{margin-top:2.5rem;border-top:1px solid #ddd;padding-top:1rem}.wiki-children h2,.wiki-siblings h2,.wiki-backlinks h2{font-size:1rem;color:#666;margin-bottom:.5rem;font-weight:400;text-transform:uppercase;letter-spacing:.05em}#wiki-graph{width:100%;height:70vh;border:1px solid #ddd;border-radius:4px}.container[data-astro-cid-37fxchfa]{max-width:56rem;margin:0 auto;margin-top:2rem;padding:0 1.5rem}
+.sep[data-astro-cid-qo2a4o5t]{color:#999;padding:0 .25rem}
+ul[data-astro-cid-btyu5urm]{list-style:none;padding:0}li[data-astro-cid-btyu5urm]{padding:.25rem 0}ul[data-astro-cid-4bqwb3ux]{list-style:none;padding:0}li[data-astro-cid-4bqwb3ux]{padding:.25rem 0}
+ul[data-astro-cid-tr45z6hg]{list-style:none;padding:0}li[data-astro-cid-tr45z6hg]{padding:.35rem 0}.desc[data-astro-cid-tr45z6hg]{color:#666;font-size:.95rem}
+</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <nav class="wiki-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-qo2a4o5t> <a href="/" data-astro-cid-qo2a4o5t>Home</a>  <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki" data-astro-cid-qo2a4o5t>Wiki</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science" data-astro-cid-qo2a4o5t>computer_science</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science/distributed_systems" data-astro-cid-qo2a4o5t>distributed_systems</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <span data-astro-cid-qo2a4o5t>distributed_systems</span> </nav>  <h1>Distributed Systems</h1> <h2 id="what-is-a-distributed-system">What is a distributed system?</h2>
+<ul>
+<li>A system in which hardware or software components located at networked computers communicate and coordinate their efforts</li>
+<li>A collection of independant computers that appears to its users as a single computer.</li>
+</ul>
+<h3 id="key-aspects">Key Aspects</h3>
+<ul>
+<li>a number of components</li>
+<li>communication between components</li>
+<li>achieve more than the simple sum of individual components</li>
+</ul>
+<h2 id="computer-networks-vs-distributed-systems">Computer Networks vs Distributed Systems</h2>
+<p><strong>Computer Network</strong> : Is a collection of spatially seperated, interconnected computer that exchange messages based on specific protocols. Computers are addressed by IP addresses.</p>
+<p><strong>Distributed System :</strong> Multiple computers on the network working together as a system. The spatial seperation of computers and communication aspects are hidden from users.</p>
+<h2 id="why-distributed-systems">Why Distributed Systems?</h2>
+<h3 id="resource-sharing">Resource sharing</h3>
+<ul>
+<li>Hardware</li>
+<li>Software</li>
+<li>Other (Processing power, memory, bandwidth)</li>
+</ul>
+<h3 id="benefits-of-resource-sharing">Benefits of resource sharing</h3>
+<ul>
+<li>Economy</li>
+<li>Reliability</li>
+<li>Availability</li>
+<li>Scalability</li>
+</ul>
+<h2 id="consequences-of-distributed-systems">Consequences of Distributed Systems</h2>
+<ul>
+<li>Concurrency : In a distributed system computers perform their tasks autonomously and communicate with other computers. Services provided by distributed systems will be accessed by multiple users. Distributed systems should take this into consideration.</li>
+<li>No global clock : Clocks on individual computers operate independantly. There are limits to the accuracy with which computers in the system can synchronize their clocks.</li>
+<li>Independant failures : Some components may fail while others are running. Failures of participating computers of the system is not known to others immediately.</li>
+</ul> <section class="wiki-siblings" data-astro-cid-btyu5urm><h2 data-astro-cid-btyu5urm>Siblings</h2><ul data-astro-cid-btyu5urm><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/cap" data-astro-cid-btyu5urm>CAP (or more accurately PACELC) theorem</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/distributed_systems_challenges" data-astro-cid-btyu5urm>Challenges of Distributed Systems</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/computer_networks" data-astro-cid-btyu5urm>Computer Networks</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/consistency" data-astro-cid-btyu5urm>Consistency</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/crdt" data-astro-cid-btyu5urm>CRDT (Conflict-free Replicated Data Types)</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/distributed_file_systems" data-astro-cid-btyu5urm>distributed file systems</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/distributed_models" data-astro-cid-btyu5urm>distributed models</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/flp_result" data-astro-cid-btyu5urm>flp result</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/operating_systems" data-astro-cid-btyu5urm>operating systems</a></li></ul></section>   </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>  

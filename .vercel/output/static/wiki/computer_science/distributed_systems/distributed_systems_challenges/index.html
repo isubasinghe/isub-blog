@@ -1,0 +1,117 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Challenges of Distributed Systems</title><meta name="description" content="Isitha's wiki — Challenges of Distributed Systems"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.wiki-link.broken{color:#b00020;text-decoration:underline dotted #b00020;cursor:help}.wiki-breadcrumbs{font-size:.95rem;margin-bottom:1rem;color:#555}.wiki-breadcrumbs a{font-size:.95rem}.wiki-children,.wiki-siblings,.wiki-backlinks{margin-top:2.5rem;border-top:1px solid #ddd;padding-top:1rem}.wiki-children h2,.wiki-siblings h2,.wiki-backlinks h2{font-size:1rem;color:#666;margin-bottom:.5rem;font-weight:400;text-transform:uppercase;letter-spacing:.05em}#wiki-graph{width:100%;height:70vh;border:1px solid #ddd;border-radius:4px}.container[data-astro-cid-37fxchfa]{max-width:56rem;margin:0 auto;margin-top:2rem;padding:0 1.5rem}
+.sep[data-astro-cid-qo2a4o5t]{color:#999;padding:0 .25rem}
+ul[data-astro-cid-btyu5urm]{list-style:none;padding:0}li[data-astro-cid-btyu5urm]{padding:.25rem 0}ul[data-astro-cid-4bqwb3ux]{list-style:none;padding:0}li[data-astro-cid-4bqwb3ux]{padding:.25rem 0}
+ul[data-astro-cid-tr45z6hg]{list-style:none;padding:0}li[data-astro-cid-tr45z6hg]{padding:.35rem 0}.desc[data-astro-cid-tr45z6hg]{color:#666;font-size:.95rem}
+</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <nav class="wiki-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-qo2a4o5t> <a href="/" data-astro-cid-qo2a4o5t>Home</a>  <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki" data-astro-cid-qo2a4o5t>Wiki</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science" data-astro-cid-qo2a4o5t>computer_science</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science/distributed_systems" data-astro-cid-qo2a4o5t>distributed_systems</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <span data-astro-cid-qo2a4o5t>distributed_systems_challenges</span> </nav>  <h1>Challenges of Distributed Systems</h1> <ul>
+<li>Heterogenity</li>
+<li>Openness</li>
+<li>Security</li>
+<li>Scalability</li>
+<li>Failure Handling</li>
+<li>Concurrency</li>
+<li>Transparency</li>
+</ul>
+<h2 id="heterogenity">Heterogenity</h2>
+<p>Distributed Systems may use completely different hardware and software. These listed above are examples of differring hardware/software:</p>
+<ul>
+<li>
+<p>Networks</p>
+</li>
+<li>
+<p>Computer Hardware</p>
+</li>
+<li>
+<p>Operating Systems</p>
+</li>
+<li>
+<p>Programming Languages</p>
+</li>
+<li>
+<p>Implementation by different developers</p>
+<p>These problems have some solutions such as:</p>
+</li>
+<li>
+<p>Using standard protocols</p>
+</li>
+<li>
+<p>Using agreed upon message formats and data types</p>
+</li>
+<li>
+<p>Adhering to an API</p>
+</li>
+<li>
+<p>Middleware</p>
+</li>
+<li>
+<p>Portable code (code that is not tighly coupled to specific hardware)</p>
+</li>
+</ul>
+<h2 id="middleware">Middleware</h2>
+<p>Middleware is a software layer between the distributed application and the operating system that:</p>
+<ul>
+<li>provides a programming abstraction and</li>
+<li>masks the heterogenity of underlying platform</li>
+</ul>
+<h3 id="middleware-models">Middleware Models</h3>
+<ul>
+<li>Distributed File Systems</li>
+<li>Remote Procedure Call (RPC)</li>
+<li>Remote Method Invocation (RMI)</li>
+<li>Distributed Documents</li>
+<li>Distributed Databases</li>
+</ul>
+<h2 id="openness">Openness</h2>
+<p>Openness refers to the ability to extend the system in different ways by adding hardware or software resources. Following are some approaches to address openness:</p>
+<ul>
+<li>Publishing key interfaces</li>
+<li>Allowing a uniform communication mechanism to communicate over the published interfaces.</li>
+<li>Ensuring all implementations adhere to the published standards.</li>
+</ul>
+<h2 id="security">Security</h2>
+<p>There are three aspects of security:</p>
+<ol>
+<li>Confidentiality</li>
+<li>Integrity</li>
+<li>Availability</li>
+</ol>
+<p>Security Mechanisms:</p>
+<ol>
+<li>Encryption</li>
+<li>Authentication</li>
+<li>Authorization</li>
+</ol>
+<h2 id="scalability">Scalability</h2>
+<p>A system should be able to handle growth in users.</p>
+<h3 id="scalability-challenges">Scalability Challenges</h3>
+<ul>
+<li>Cost of physical resources</li>
+<li>Controlling performance loss</li>
+<li>Resources should not run out</li>
+<li>Avoiding performance bottlenecks</li>
+</ul>
+<h2 id="failure-handling">Failure Handling</h2>
+<ul>
+<li><strong>Detecting :</strong> some types of failures can be detected and some are hard to be certain about.</li>
+<li><strong>Masking :</strong> some failures that have been detected can be hidden or made less severe;</li>
+<li><strong>Tolerating :</strong> it is sometimes impractical to try and handle every failure that occurs</li>
+<li><strong>Recovery :</strong> some failures can recover, for example a rollback mechanism</li>
+<li><strong>Redundancy :</strong> some failures can be made to tolerate failure using redundant components (eg multiple services that provide the same service(failover))</li>
+</ul>
+<h2 id="concurrency">Concurrency</h2>
+<ul>
+<li>Multiple clients can access the same resource at the same time, in some cases for updates.</li>
+<li>One approach to handling concrrency is making access sequential - slows down the system.</li>
+<li>Semaphores supported by the operating system is a well accepted mechanism to handle concurrency.</li>
+</ul>
+<h2 id="transparency">Transparency</h2>
+<p>Hiding certain aspects from the user and application programmer</p>
+<ul>
+<li>Access</li>
+<li>Location</li>
+<li>Concurrency</li>
+<li>Replication</li>
+<li>Failure</li>
+<li>Mobility</li>
+<li>Performance</li>
+<li>Scaling</li>
+</ul> <section class="wiki-siblings" data-astro-cid-btyu5urm><h2 data-astro-cid-btyu5urm>Siblings</h2><ul data-astro-cid-btyu5urm><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/cap" data-astro-cid-btyu5urm>CAP (or more accurately PACELC) theorem</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/computer_networks" data-astro-cid-btyu5urm>Computer Networks</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/consistency" data-astro-cid-btyu5urm>Consistency</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/crdt" data-astro-cid-btyu5urm>CRDT (Conflict-free Replicated Data Types)</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/distributed_file_systems" data-astro-cid-btyu5urm>distributed file systems</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/distributed_models" data-astro-cid-btyu5urm>distributed models</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/distributed_systems" data-astro-cid-btyu5urm>Distributed Systems</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/flp_result" data-astro-cid-btyu5urm>flp result</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/operating_systems" data-astro-cid-btyu5urm>operating systems</a></li></ul></section>   </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>  

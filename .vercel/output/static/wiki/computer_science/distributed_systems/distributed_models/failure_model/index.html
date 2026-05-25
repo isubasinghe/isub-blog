@@ -1,0 +1,108 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>failure model</title><meta name="description" content="Isitha's wiki — failure model"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.wiki-link.broken{color:#b00020;text-decoration:underline dotted #b00020;cursor:help}.wiki-breadcrumbs{font-size:.95rem;margin-bottom:1rem;color:#555}.wiki-breadcrumbs a{font-size:.95rem}.wiki-children,.wiki-siblings,.wiki-backlinks{margin-top:2.5rem;border-top:1px solid #ddd;padding-top:1rem}.wiki-children h2,.wiki-siblings h2,.wiki-backlinks h2{font-size:1rem;color:#666;margin-bottom:.5rem;font-weight:400;text-transform:uppercase;letter-spacing:.05em}#wiki-graph{width:100%;height:70vh;border:1px solid #ddd;border-radius:4px}.container[data-astro-cid-37fxchfa]{max-width:56rem;margin:0 auto;margin-top:2rem;padding:0 1.5rem}
+.sep[data-astro-cid-qo2a4o5t]{color:#999;padding:0 .25rem}
+ul[data-astro-cid-btyu5urm]{list-style:none;padding:0}li[data-astro-cid-btyu5urm]{padding:.25rem 0}ul[data-astro-cid-4bqwb3ux]{list-style:none;padding:0}li[data-astro-cid-4bqwb3ux]{padding:.25rem 0}
+ul[data-astro-cid-tr45z6hg]{list-style:none;padding:0}li[data-astro-cid-tr45z6hg]{padding:.35rem 0}.desc[data-astro-cid-tr45z6hg]{color:#666;font-size:.95rem}
+</style></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <nav class="wiki-breadcrumbs" aria-label="Breadcrumb" data-astro-cid-qo2a4o5t> <a href="/" data-astro-cid-qo2a4o5t>Home</a>  <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki" data-astro-cid-qo2a4o5t>Wiki</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science" data-astro-cid-qo2a4o5t>computer_science</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science/distributed_systems" data-astro-cid-qo2a4o5t>distributed_systems</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <a href="/wiki/computer_science/distributed_systems/distributed_models" data-astro-cid-qo2a4o5t>distributed_models</a> <span class="sep" data-astro-cid-qo2a4o5t> › </span> <span data-astro-cid-qo2a4o5t>failure_model</span> </nav>  <h1>failure model</h1> <h2 id="failure-model">Failure Model</h2>
+<p>The failures in processes and channels are presented using the following taxonomy:</p>
+<ul>
+<li>Omission failures</li>
+<li>Arbitrary failures</li>
+<li>Timing failures</li>
+</ul>
+<h3 id="omissions-failures">Omissions Failures</h3>
+<p>Omission failures refers to cases where a process or a communication channel fails to perform what is expected to do.</p>
+<ul>
+<li>Process omission failures:
+<ul>
+<li>Normally caused by a process crash</li>
+<li>Repeated failures during invocation is an indication</li>
+<li>Timeouts can be used to detect this type of crash</li>
+<li>A crash is referred to as <strong>fail-stop</strong> if other processes can detect certainly that the process crashed.</li>
+</ul>
+</li>
+</ul>
+<h4 id="communication-omission-failure-could-be-to">Communication omission failure could be to:</h4>
+<ul>
+<li>Send omission failure: A message not being transported from sending process to its outgoing buffer.</li>
+<li>Recieve omission failure: A message not being transported from the receiving process’s incoming message buffer and the receiving process.</li>
+<li>Channel omission failures: A message not being transported from <strong>p</strong>’s outgoing message buffer to <strong>q</strong>’s incoming message buffer.</li>
+</ul>
+<h3 id="arbitrary-failures-byzantine-failure">Arbitrary Failures (Byzantine failure)</h3>
+<p>Refers to any type of failure that can occur in a system. Could be due to:</p>
+<ul>
+<li>Intended steps omitted in processing</li>
+<li>Message contents corrupted</li>
+<li>Non-existent messages delivered</li>
+<li>Real messages delivered more than once</li>
+</ul>
+<h3 id="omission-and-arbitrary-failures">Omission and arbitrary failures</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th align="center">Class of failure</th><th align="center">Affects</th><th align="center">Description</th></tr></thead><tbody><tr><td align="center">Fail-stop</td><td align="center">Process</td><td align="center">Process halts and remains halted. Other processes may detect this state</td></tr><tr><td align="center">Crash</td><td align="center">Process</td><td align="center">Process halts and remains so. Other processes may not detect this state</td></tr><tr><td align="center">Omission</td><td align="center">Channel</td><td align="center">A message inserted in an outgoing message buffer never arrives at the other end’s incoming message buffer</td></tr><tr><td align="center">Send-omission</td><td align="center">Process</td><td align="center">Process attempts send but message not placed in outgoing buffer</td></tr><tr><td align="center">Receive-omission</td><td align="center">Process</td><td align="center">Message received in incoming buffer but process does not receive it</td></tr><tr><td align="center">Arbitrary</td><td align="center">Process or channel</td><td align="center"></td></tr></tbody></table>
+<h3 id="timing-failures">Timing Failures</h3>
+<p>Occurs when time limits set on process execution time, message delivery time
+and clock rate drift. They are particularly relevant to synchronous systems and less relevant to asynchronous systems since the latter usually places no or less strict bounds on timing</p>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<table><thead><tr><th align="center">Class of failure</th><th align="center">Affects</th><th align="center">Description</th></tr></thead><tbody><tr><td align="center">Clock</td><td align="center">Process</td><td align="center">Process’s local clock exceeds the bounds on its rate of drift from real time</td></tr><tr><td align="center">Performance</td><td align="center">Process</td><td align="center">Process exceeds the bounds on the interval between two steps</td></tr><tr><td align="center">Performance</td><td align="center">Channel</td><td align="center">A message’s transmission takes longer than the stated bound</td></tr></tbody></table> <section class="wiki-siblings" data-astro-cid-btyu5urm><h2 data-astro-cid-btyu5urm>Siblings</h2><ul data-astro-cid-btyu5urm><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/distributed_models/communication_paradigms" data-astro-cid-btyu5urm>communication paradigms</a></li><li data-astro-cid-btyu5urm><a href="/wiki/computer_science/distributed_systems/distributed_models/distributed_models" data-astro-cid-btyu5urm>Distributed Models</a></li></ul></section>   </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>  
