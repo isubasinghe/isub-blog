@@ -13,6 +13,10 @@ const wikiBase = fileURLToPath(new URL('./src/content/wiki', import.meta.url));
 export default defineConfig({
   output: 'static',
   adapter: vercel(),
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: 'hover',
+  },
   integrations: [solidJs(), mdx()],
   markdown: {
     remarkPlugins: [
