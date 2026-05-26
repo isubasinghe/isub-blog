@@ -3,6 +3,8 @@
 // stand-in shape (WikiEntryLike) so this module doesn't depend on Astro's
 // content types at test time.
 
+import { posix as pathPosix } from 'node:path';
+
 export interface WikiEntryLike {
   id: string;
   body?: string;
@@ -119,6 +121,49 @@ export function displayTitle<E extends WikiEntryLike>(entry: E): string {
 // even though current consumers only use bare basenames.
 const WIKI_LINK_RE = /\[\[([A-Za-z0-9_\-/]+)(?:\|[^\]]+)?\]\]/g;
 
+// Match a standard markdown link destination: `](url)` or `](url "title")`.
+// Captures the bare URL (no surrounding whitespace, no title). Images
+// (`![alt](src)`) are matched by the same pattern but filtered out later
+// because their src never ends in .md/.mdx.
+const MD_LINK_RE = /\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
+
+// Detect a destination that isn't a local file: any URI scheme
+// (http:, https:, mailto:, ftp:, etc.), protocol-relative `//foo`, or a
+// bare anchor `#section`.
+const EXTERNAL_TARGET_RE = /^(?:[a-z][a-z0-9+.\-]*:|\/\/|#)/i;
+
+/**
+ * Resolve a markdown link destination against the source entry's id and
+ * return the corresponding entry id, or null if the link doesn't point at
+ * a wiki page (external, non-.md, or escapes the wiki root).
+ *
+ *   resolveMdLinkTarget('foo.md', 'a')          → 'foo'
+ *   resolveMdLinkTarget('../foo.md', 'sub/a')   → 'foo'
+ *   resolveMdLinkTarget('foo.md#x', 'a')        → 'foo'
+ *   resolveMdLinkTarget('https://…/foo.md', _)  → null
+ *   resolveMdLinkTarget('foo.png', _)           → null
+ *   resolveMdLinkTarget('../../outside.md', _)  → null
+ */
+function resolveMdLinkTarget(rawTarget: string, sourceId: string): string | null {
+  let target = decodeMdEscapes(rawTarget);
+  if (EXTERNAL_TARGET_RE.test(target)) return null;
+  const hashIdx = target.indexOf('#');
+  if (hashIdx >= 0) target = target.slice(0, hashIdx);
+  const qIdx = target.indexOf('?');
+  if (qIdx >= 0) target = target.slice(0, qIdx);
+  if (!target || !/\.mdx?$/i.test(target)) return null;
+
+  const sourceDir = pathPosix.dirname(sourceId);
+  const joined = sourceDir === '.' ? target : pathPosix.join(sourceDir, target);
+  const normalized = pathPosix.normalize(joined);
+  if (normalized === '..' || normalized.startsWith('../')) return null;
+
+  const noExt = normalized.replace(/\.mdx?$/i, '');
+  // Astro's glob loader normalizes entry ids to lowercase; mirror that
+  // here so resolved targets compare equal to entry ids.
+  return noExt.toLowerCase();
+}
+
 /**
  * Strip fenced code blocks and inline code from a markdown body before
  * scanning for wiki-links. Cheap and good enough for the regex pass we
@@ -134,11 +179,15 @@ function stripCode(body: string): string {
     .replace(/`[^`\n]*`/g, '');
 }
 
-function extractRefs(body: string): string[] {
+function extractRefs(body: string, sourceId: string): string[] {
   const cleaned = stripCode(body);
   const refs: string[] = [];
   for (const match of cleaned.matchAll(WIKI_LINK_RE)) {
     refs.push(match[1]);
+  }
+  for (const match of cleaned.matchAll(MD_LINK_RE)) {
+    const resolved = resolveMdLinkTarget(match[1], sourceId);
+    if (resolved !== null) refs.push(resolved);
   }
   return refs;
 }
@@ -148,7 +197,7 @@ export function buildLinkIndex<E extends WikiEntryLike>(entries: E[]): LinkIndex
   const incoming = new Map<string, Set<string>>();
 
   for (const e of entries) {
-    const refs = extractRefs(e.body ?? '');
+    const refs = extractRefs(e.body ?? '', e.id);
     if (refs.length === 0) continue;
 
     let out = outgoing.get(e.id);
@@ -189,6 +238,49 @@ export function backlinksFor<E extends WikiEntryLike>(
   return result;
 }
 
+// Map the folder path that an entry conceptually "lives in" — for a leaf
+// `concurrency/atomic-ops` that's `concurrency`; for a folder index
+// `concurrency/readme` that's the *containing* folder (root, here ''); for
+// the root index it's null (no parent). Used to find the entry's parent
+// folder-index page for structural edges.
+function parentFolderPathOf(id: string): string | null {
+  if (ROOT_INDEX_RE.test(id)) return null;
+  const m = id.match(FOLDER_INDEX_SUFFIX_RE);
+  const stripped = m ? id.slice(0, -m[0].length) : id;
+  const slash = stripped.lastIndexOf('/');
+  return slash === -1 ? '' : stripped.slice(0, slash);
+}
+
+function buildFolderIndexMap<E extends WikiEntryLike>(
+  entries: E[],
+): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const e of entries) {
+    if (!isFolderIndexId(e.id)) continue;
+    const folderPath = ROOT_INDEX_RE.test(e.id)
+      ? ''
+      : e.id.replace(FOLDER_INDEX_SUFFIX_RE, '');
+    if (!map.has(folderPath)) map.set(folderPath, e.id);
+  }
+  return map;
+}
+
+// Hierarchy edges: each entry's parent folder-index page → the entry.
+// Encodes the folder tree as graph edges so the visualization shows
+// connections even when authors don't cross-reference between pages.
+function structuralEdges<E extends WikiEntryLike>(entries: E[]): GraphEdge[] {
+  const folderIndex = buildFolderIndexMap(entries);
+  const edges: GraphEdge[] = [];
+  for (const e of entries) {
+    const parentPath = parentFolderPathOf(e.id);
+    if (parentPath === null) continue;
+    const parentId = folderIndex.get(parentPath);
+    if (!parentId || parentId === e.id) continue;
+    edges.push({ from: parentId, to: e.id });
+  }
+  return edges;
+}
+
 export function graphData<E extends WikiEntryLike>(
   entries: E[],
   index: LinkIndex,
@@ -201,12 +293,23 @@ export function graphData<E extends WikiEntryLike>(
   }));
 
   const edges: GraphEdge[] = [];
+  const seen = new Set<string>();
+  const push = (from: string, to: string): void => {
+    const key = from + '\0' + to;
+    if (seen.has(key)) return;
+    seen.add(key);
+    edges.push({ from, to });
+  };
+
   for (const [from, targets] of index.outgoing) {
     if (!known.has(from)) continue; // shouldn't happen, defensive
     for (const to of targets) {
       if (!known.has(to)) continue; // skip dangling references
-      edges.push({ from, to });
+      push(from, to);
     }
+  }
+  for (const e of structuralEdges(entries)) {
+    push(e.from, e.to);
   }
 
   return { nodes, edges };

@@ -1,13 +1,19 @@
 ---
-import { breadcrumbs } from '../../lib/wiki/paths';
+import { breadcrumbs, knownFolderIndexes } from '../../lib/wiki/paths';
 
 interface Props {
   /** Wiki entry id (e.g. "concurrency/atomic-ops" or "index"). */
   id: string;
+  /**
+   * Optional collection entries. Used to skip linking breadcrumb segments
+   * whose folder has no `README.md` / `index.md` — those URLs would 404.
+   */
+  entries?: { id: string }[];
 }
 
-const { id } = Astro.props;
-const crumbs = breadcrumbs(id);
+const { id, entries } = Astro.props;
+const folderIndexes = entries ? knownFolderIndexes(entries) : undefined;
+const crumbs = breadcrumbs(id, folderIndexes);
 ---
 
 <nav class="wiki-breadcrumbs" aria-label="Breadcrumb">
@@ -15,7 +21,9 @@ const crumbs = breadcrumbs(id);
   {crumbs.map((c) => (
     <>
       <span class="sep"> › </span>
-      {c.current ? <span>{c.label}</span> : <a href={c.url}>{c.label}</a>}
+      {c.current || c.url === null
+        ? <span>{c.label}</span>
+        : <a href={c.url}>{c.label}</a>}
     </>
   ))}
 </nav>

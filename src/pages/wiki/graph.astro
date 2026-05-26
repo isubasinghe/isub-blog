@@ -11,7 +11,7 @@ const data = graphData(entries, index);
 ---
 
 <BaseLayout title="Wiki — Graph" description="Wiki link graph">
-  <Breadcrumbs id="index" />
+  <Breadcrumbs id="index" entries={entries} />
   <h1>Link graph</h1>
   <p>Click a node to jump to that page.</p>
   <WikiGraph data={data} client:only="solid-js" />

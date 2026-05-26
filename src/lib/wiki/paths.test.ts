@@ -5,6 +5,7 @@ import {
   siblingsOf,
   folderIdOf,
   isFolderIndex,
+  knownFolderIndexes,
 } from './paths';
 
 const e = (id: string) => ({ id });
@@ -56,6 +57,68 @@ describe('breadcrumbs', () => {
     expect(c.map(x => x.label)).toEqual(['Wiki', 'a', 'b', 'c']);
     expect(c.map(x => x.url)).toEqual(['/wiki', '/wiki/a', '/wiki/a/b', '/wiki/a/b/c']);
     expect(c[c.length - 1].current).toBe(true);
+  });
+
+  describe('with knownFolderIndexes', () => {
+    it('renders a folder segment without an index as non-linkable (url null)', () => {
+      // "a/b/c" where folder "a" has an index but "a/b" does not.
+      const c = breadcrumbs('a/b/c', new Set(['a']));
+      expect(c.map(x => x.url)).toEqual(['/wiki', '/wiki/a', null, '/wiki/a/b/c']);
+      expect(c[2].label).toBe('b');
+      expect(c[2].current).toBe(false);
+    });
+
+    it('keeps every folder segment linkable when each has an index', () => {
+      const c = breadcrumbs('a/b/c', new Set(['a', 'a/b']));
+      expect(c.map(x => x.url)).toEqual(['/wiki', '/wiki/a', '/wiki/a/b', '/wiki/a/b/c']);
+    });
+
+    it('keeps the root "Wiki" crumb linkable even when no entries have indexes', () => {
+      // /wiki is served by index.astro regardless of whether a root README
+      // entry exists, so the root crumb is always navigable.
+      const c = breadcrumbs('a/b/c', new Set());
+      expect(c[0]).toEqual({ label: 'Wiki', url: '/wiki', current: false });
+      expect(c[1].url).toBeNull();
+      expect(c[2].url).toBeNull();
+    });
+
+    it('still marks the leaf segment as current regardless of the parent set', () => {
+      const c = breadcrumbs('a/b/c', new Set());
+      expect(c[c.length - 1].current).toBe(true);
+      expect(c[c.length - 1].label).toBe('c');
+    });
+  });
+});
+
+describe('knownFolderIndexes', () => {
+  it('collects folder paths of every index/README entry', () => {
+    const entries = [
+      e('README'),
+      e('software_engineering/README'),
+      e('software_engineering/management/README'),
+      e('software_engineering/management/quality_management/quality_assurance'),
+      e('software_engineering/management/project_scheduleing/project_tracking_control'),
+    ];
+    const set = knownFolderIndexes(entries);
+    // Root index resolves to the empty folder path.
+    expect(set.has('')).toBe(true);
+    expect(set.has('software_engineering')).toBe(true);
+    expect(set.has('software_engineering/management')).toBe(true);
+    // Folders without a README aren't in the set.
+    expect(set.has('software_engineering/management/quality_management')).toBe(false);
+    expect(set.has('software_engineering/management/project_scheduleing')).toBe(false);
+  });
+
+  it('treats both index.md and README.md (any case) as a folder index', () => {
+    const entries = [
+      e('foo/index'),
+      e('bar/readme'),
+      e('baz/README'),
+    ];
+    const set = knownFolderIndexes(entries);
+    expect(set.has('foo')).toBe(true);
+    expect(set.has('bar')).toBe(true);
+    expect(set.has('baz')).toBe(true);
   });
 });
 

@@ -44,7 +44,7 @@ const showChildren = isFolderIndex(entry.id);
 ---
 
 <BaseLayout title={title} description={description}>
-  <Breadcrumbs id={entry.id} />
+  <Breadcrumbs id={entry.id} entries={allEntries} />
   <h1>{title}</h1>
   <Content />
   {showChildren && <ChildList parentId={folderId} entries={allEntries} />}
