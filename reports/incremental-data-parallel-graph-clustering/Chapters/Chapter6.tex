@@ -1,0 +1,21 @@
+\chapter{Conclusion \& Further Work}
+
+\section{Future Work}
+\subsection{Differential Dataflow}
+Unfortunately at this stage, we believe that Differential Dataflow is not completely ready yet to be used in general purpose incremental programs without willing to pay a significant software engineering cost as a result of the inherent complexity of using a hardly documented, research piece of software. An interesting approach to solving this problem could be perhaps to expose the ability to perform incremental computations at a higher abstraction layer, this is very much inline with the approach taken by the other `Big-Data' processing frameworks such as Apache Spark. This hypothetical implementation also may gain an advantage due to its incremental computational model relying on a partial ordering of entries, although this should be explored in more detail, the advantage could be the ability to avoid implementing a variant of the Chandy-Lamport algorithm which is needed to ensure recovery from failures. 
+
+\subsection{Differential Dataflow Operators}
+Unfortunately, even certain trivially incremental operators such as `max' and `min' are not available through the open source implementation, future work could examine how more operators could be added to Differential Dataflow in order to increase its expressive power. 
+
+\subsection{Other Graph Clustering Methods}
+While we have demonstrated how Differential Dataflow could be used to implement Louvain modularity optimisation, we have not explored the efficacy of other graph clustering methods, it is likely worth the effort to explore how other graph clustering algorithms could be implemented in such a way that it is able to take advantage of incremental computations, it may be the case that some traditionally more costly algorithms end up being significantly cheaper when differential dataflow is used. 
+
+\subsection{Incremental Hierarchical clustering}
+\label{section:incr_hier_clustering}
+If we are able to generalise even more on the partial ordering of time implemented in differential dataflow, we could use this to provide movement of already agglomerated vertices between clusters, what this means is that there is potential for modularity greater than what Louvain would normally find. The change here would be to represent time as vector of length three, this is not too different from the existing implementation, the additional entry here would simply represent the number of times a given node has been agglomerated. When new nodes are added, we would be able to examine if a certain vertex belongs in a different community due to this change, when the answer to this question is yes, a certain amount of work would be performed to propagate these changes throughout the hierarchy, the important distinction is that when communities remain the same, this work would be avoided entirely. 
+
+\subsection{Unifying ``Self Adjusting Computations''}
+While ``Self Adjusting Computations'' are not directly usable for the computation of dataflow programs \cite{mcsherry2013differential}, there is potential for unifying ``Self Adjusting Computations'' for the purpose of incremental reductions. As mentioned previously the `reduce' operator does not have any incremental properties due to the expressiveness of the operator, using ``Self Adjusting Computations'' here could prove to be a significant advantage in incrementally performing our reductions, this would reduce our max $Q$ determination from $\mathcal{O}(n)$ to $\mathcal{O}(1)$ in the best case, where $n$ is the number of neighbours. 
+
+\section{Conclusion}
+We have presented how the Louvain modularity optimisation algorithm could be implemented with Differential Dataflow and demonstrated its efficacy in performing incremental adjustments, we believe that this technique makes the act of incremental graph clustering via the Louvain method a viable candidate in \textit{some} real time applications. Additionally, the implementation of Louvain on top of `Timely Dataflow' through the Differential Dataflow library provides an excellent way to parallelise the method over multiple cores and even multiple machines. 

@@ -1,0 +1,482 @@
+\chapter{Filesystem}
+
+This chapter discusses the filesystem project.
+We will first analyze the performance of the provided block driver and consider
+a simple optimization.
+Then we lay out the design of the Filesystem infrastructure that we built on top
+of this driver discussing each component in detail.
+
+\section{Block Driver Performance}
+
+As the book states, the provided block driver is incredibly slow.
+As seen in \autoref{fig:fs_sdhc} the provided driver takes 953.55ms to read and
+960.01ms to write a block from or to the SD card.
+These measurements were done by repeatedly (30 times) transferring a block (512 Bytes) between a sector on the device and a fixed physical address on the host.
+Reading and writing were measured separately.
+This was tested with both the provided SD card as well as a model from SanDisk.
+Both yielded comparable results, so that we only show the former since it was provided by the course.
+
+Note, that this benchmark was performed while the full OS was running.
+It was also executed on core 0, where most services -including the filesystem server- run.
+These measurements thus represent a more realistic scenario than an isolated 
+benchmark since it also measures interference from, for example, the scheduler.
+This shows the performance impact of the various \mintinline{C}{barrelfish_usleep}
+operations that the driver performs since these will result in yielding the
+calling process.
+
+When talking to other teams, we discovered that their baseline was more in the
+range of 450ms. They appeared to be measuring performance in a more isolated setting.
+While this is good for obtaining the best case performance of the driver, 
+the results of our benchmark show the added performance impact of yielding in
+the setting of a contested scheduler.
+
+\begin{figure}[ht]
+    \centering
+    \scalebox{0.6}{\includesvg{./figs/fs_sdhc.svg} }
+    \caption{SDHC Block driver performance with and without our optimization.}
+    \label{fig:fs_sdhc}
+\end{figure}
+
+There is plenty of potential for speedup here, since modern SD card can reach transfer-speeds of multiple MB/s. 
+
+We were restricted on time and thus chose not to explore the optimization of the
+driver in great detail.
+Instead we focus on the engineering challenge of creating a filesystem around the block device.
+The filesystem will have to try to mitigate the performance impact of the slow driver.
+
+However, We did find a small optimization that results in a roughly $2x$
+speedup.
+
+Looking at the implementation of \mintinline{c}{sdhc_read_block} and \mintinline{c}{sdhc_write_block} we noticed that a set block length command is send before every read and write.
+This seemed redundant since the block length does not change during the
+execution.
+Removing these commands resulted in a read latency of 473.54ms per block and a
+write latency of 480ms per block.
+We still issue the command to set the block size once at the beginning when initializing the device.
+
+The question remains whether this is a legitimate optimization or if we are sacrificing correctness and conformity to the protocol by doing this.
+After extensive testing we did not encounter any errors when transferring blocks and thus assume that this optimization is legitimate. 
+
+The benchmark for the block operations can be found in \mintinline{c}{usr/drivers/fsfat32/benchmarks/sd_card_bench.h}
+
+In the following we will assume the block driver runs with our optimization.
+
+\section{FAT32 Filesystem}
+
+As suggested in the courses accompanying book we implement a filesystem for FAT32 formatted block devices.
+The implementation tries to be close to the standard, but cuts some corners to save time.
+The filesystem infrastructure consists of multiple layers that provide increasingly abstract interfaces for reading and writing to the FAT32 formatted block device.
+
+These components are, in increasing abstraction:
+\begin{itemize}
+    \item An \textit{SDHC Wrapper} Library around the provided driver.
+    \item A \textit{FAT32 Library} for basic file operations.
+    \item A \textit{Filesystem Server} providing an RPC interface to the files and controlling access to the same.
+    \item A \textit{Client Side Library (fatfs lib)} to interact with the RPC Server and maintain the state of files in the client.
+\end{itemize}
+
+Figure \ref{fig:fs_arch} gives an overview of the Architecure of the Filesystem
+infrastructure.
+In the following we will discuss these components in detail.
+
+\begin{figure}[ht]
+    \centering
+    \scalebox{0.6}{\includesvg{./figs/FSServer_Infra.svg} }
+    \caption{Architecture of the Filesystem Infrastructure.}
+    \label{fig:fs_arch}
+\end{figure}
+
+
+\subsection{SDHC Wrapper}
+
+The provided driver only exposes an interface for transferring single blocks between the device and a physical memory location.
+Using this interface directly is clumsy which is why we create a wrapper around it. 
+This wrapper provides functions for reading and writing multiple blocks and just parts of blocks to either physical or virtual addresses:
+
+\begin{minted}{c}
+errval_t read_from_sd_offset(struct sd_wrapper *sd, void *dst, uint32_t sector, 
+                                uint32_t offset, uint32_t size);
+errval_t write_to_sd_offset(struct sd_wrapper *sd, uint32_t sector, 
+                                uint32_t offset, const void *src, uint32_t size);
+
+errval_t read_from_sd_to_paddr(struct sd_wrapper *sd, lpaddr_t paddr, 
+                                uint32_t sector, uint32_t size);
+errval_t write_to_sd_from_paddr(struct sd_wrapper *sd, lpaddr_t paddr, 
+                                uint32_t sector, uint32_t size);
+\end{minted}
+
+The first two functions allow reading and writing data of arbitrary sizes at any offset withing a block.
+
+We will use the terms sector and block interchangeably. For both we assume 512 bytes.
+
+When using \mintinline{C}{read_from_sd_offset()}, the block driver writes to an internal buffer. 
+The desired chunks are then copied over to the buffer provided by the user.
+Writing works analogously.
+
+The latter two calls do not buffer and thus require less copying. 
+This results in them being slightly more restrictive, as they do not allow an offset and the size parameter has to be a multiple of the block size.
+
+\subsubsection{Idea for Optimization: Caching Blocks}
+As described later in the chapter, we already have a write-through cache for FAT entries.
+When writing back the entries, this uses the buffered operations provided by this wrapper.
+
+By using a write-back cache, we could further cache the write accesses in the buffer and only write them to disk, when we need the buffer space for something else.
+This would eliminates a lot of accesses to the device, since usually (assuming locality) fat entries are grouped together.
+
+This could also be useful when iterating through directories.
+
+It is probably less useful for writing and reading large chunks of data. The
+cache will constantly be evicted by the next chunk.
+
+This is currently not implemented, but might be an interesting investigation for
+future work.
+
+\subsection{FAT32 Library "usr/drivers/fsfat32/fat32\_file\_system.h"}
+
+Our FAT32 provides the functionality to lookup, create, read, and modify both files and directories.
+It exposes the following API:
+
+\begin{minted}{c}
+// Create and Delete Files or Directories.
+errval_t fat32_create_file(struct fat32_file_system *fat, struct dir_entry *parent,
+                            char *name, uint8_t attr, struct dir_entry *ret);
+errval_t fat32_delete_file(struct fat32_file_system *fat, struct dir_entry *parent, 
+                            struct dir_entry *dir_entry);
+
+// Read / Write / Append files.
+errval_t fat32_read(struct fat32_file_system *fat, struct dir_entry *dir_entry,
+                            void *buf, size_t pos, size_t bytes, size_t *ret_bytes);
+errval_t fat32_write(struct fat32_file_system *fat, struct dir_entry *dir_entry,
+                            void *buf, size_t pos, size_t bytes, size_t *ret_bytes);
+
+// Uses read_from_sd_to_paddr to directly read the entire file into a frame.
+errval_t fat32_readfile_to_frame(struct fat32_file_system *fat, struct dir_entry *dir_entry,
+                                struct capref frame, size_t *ret_bytes); 
+// Truncate a file.
+errval_t fat32_trunc(struct fat32_file_system *fat, struct dir_entry *dir_entry, size_t bytes);
+
+// Find a file or directory by path.
+errval_t fat32_resolve_path(struct fat32_file_system *fat, const char *path,
+                            struct dir_entry *result);
+// Find a file or directory in parent by name.
+errval_t fat32_find_dirent(struct fat32_file_system *fat, struct dir_entry *parent,
+                            char *filename, struct dir_entry *res);
+
+
+// Finds the position and name of the next non-empty directory entry in parent after the given offset.
+// Return FS_ERR_INDEX_BOUNDS if the end of the directory is reached.
+errval_t read_next_dir_after_offset(struct fat32_file_system *fat, struct dir_entry *parent,
+                                    uint64_t offset, char **ret_name, uint64_t *ret_idx);
+\end{minted}
+
+Files and directories are represented as dir\_entry structures which contain a copy of the FAT32 directory entry as well as the position of the directory entry on the disk.
+In general, files and directories are treated interchangeably. 
+They can be distinguished by the directory bit in the attribute entry.
+
+Not all operations are allowed on both directory entry types and will return FS\_ERR\_NOTFILE or FS\_ERR\_NOTDIR as appropriate.
+In general, lookup (find/resolve), creation, and deletion are defined for both.
+Reading, writing, and truncating are only allowed on files.
+To iterate through directories, we provide read\_next\_dir\_after\_offset.
+
+Note that the create function will not check if a file or directory with that name already exists.
+This must be checked by the caller beforehand.
+
+Delete will only remove directories if they are empty.
+We do not provide a direct interface to recursively delete a directory, since the function would have to check if files are still being used.
+This is out of scope for this layer (In fact, this is completely left up to the end user of the library).
+
+This layer notably provides an offset based layer.
+Streaming functionality must be implemented on top.
+Unfortunately, this means that, for every operation, files have to be traversed from the beginning until the specified offset is reached.
+We made this choice to reduce the amount of state that has to be kept by the filesystem server.
+A streaming API would require the server to keep track of the position in the file for every user that opens it.
+Keeping in line with the design of Barrelfish, we instead outsource this responsibility to the user.
+
+This design means that fast access to the file allocation table is critical.
+We achieve this using a fat cache.
+
+\subsubsection{Optimization: File Allocation Table Cache}
+Originally, all operation in the library would read and write to the block device to obtain data.
+Every read and write to an entry entry in the file allocation table resulted in a complete block operation to the SD card.
+This meant that traversing files was slow.
+
+To solve this we simply cache the file allocation table in memory.
+This speeds up file traversal significantly. 
+
+Figure \ref{fig:fs_read_one} shows the latency of reading a single cluster (4096Bytes) with a cached FAT entry vs a non cached FAT entry.
+
+
+\begin{figure}[ht]
+    \centering
+    \scalebox{0.6}{\includesvg{./figs/fs_read_one_cluster.svg} }
+    \caption{}
+    \label{fig:fs_read_one}
+\end{figure}
+
+% uncached read ms     2144.038829
+% cached read ms    1920.049408
+
+However, since reading from the SD Card is prohibitively slow it is impractical to read the entire file allocation table upon startup.
+This would mean a significant delay when starting up the system.
+It is also most likely unnecessary since not all FAT entries are needed right away. 
+
+Instead we load the FAT on demand.
+Whenever a non cached entry is read, we read the entire cluster containing the FAT entry into the cache.
+To keep consistency between the cache and the block device we use the write-through strategy.
+This means that updating a FAT entry results in writing the surrounding block to the block device.
+As a result, updating a fat entry is still expensive, but there is a noticeable difference reading is significantly faster.
+
+\subsubsection{Performance}
+
+For brevity, we evaluate the performance of a subset of the provided operations.
+We measure each execution 30 times and report the median.
+The variance is shown using small bars, but is usually so negligible that it is
+not visible.
+
+\begin{figure}[ht]
+    \centering
+         \subfloat[\centering ]{{\scalebox{0.4}{\includesvg{./figs/fs_fat32_lib_ops.svg} }}}
+         \subfloat[\centering ]{{\scalebox{0.4}{\includesvg{./figs/fs_fat32_lib_ops_slow.svg} }}}
+    \caption{}
+    \label{fig:fs_fat32_lib_ops}
+    
+% creation_ms                      2.391705
+% append_ms                        2.888078
+% find_ms                          0.240011
+% deletion_ms                     31.680818
+% reading_large_file_ms_40961B    19.444631
+\end{figure}
+
+Figure \ref{fig:fs_fat32_lib_ops} clearly shows the limitations of the block
+driver.
+Finding a file in a short directory, creating a file, and appending to an empty
+file are all relatively fast at $0.24ms$, $2.39ms$, and $2.89ms$ respectively.
+All of these instructions need a limited amount of block operations.
+
+Deleting and reading a large (40kB) file are considerably slower with $31.68ms$
+and $19.44ms$.
+These require more interaction with the block device.
+Deleting a file takes such a long time because the operation tries to cleanup
+the parent directory to release potentially empty clusters.
+This must be done to prevent the SD card running out of capacity without
+actually storing any data. 
+
+
+\subsection{Filesystem Server "usr/drivers/fsfat/"}
+
+The filesystem server exposes file operations using an RPC interface.
+It exposed interface can be found through the nameservice by looking up "FS/<mountpoint>".
+Since we only provide the filesystem for the SD card, we set this to be "FS/sdcard".
+
+This allows multiple filesystems to be mounted as a sort of VFS.
+This is currently, however, not supported by the client side library.
+
+The filesystem exposes the following RPC calls:
+\begin{minted}{c}
+FS_OPEN                 // (path, flags) -> fd, size
+FS_CREATE               // (path, flags, is_dir) -> fd
+FS_CLOSE                // (fd) -> void
+FS_READ                 // (fd, offset, size) -> data
+FS_WRITE                // (fd, data, offset) -> size
+FS_TRUNC                // (fd, size)
+FS_OPENDIR              // (path) -> fd
+FS_READNEXTDIR          // (fd, pos) -> filename
+FS_DELETE               // (path) -> void       - Used for file & dirs
+FS_READFILE_TO_FRAME    // (fd, frame_cap) -> size
+\end{minted}
+
+Like the FAT32 library that backs these RPC calls, the position in the file is
+specified using offsets from the beginning of the file.
+
+As the central point for file access to the mounted device, the server must ensure that two invariants are upheld.
+Firstly, there must never be more then one simultaneous read issued to the underlying block device.
+Secondly, write access to a file must always be exclusive while read accesses may overlap.
+These are needed to guarantee the consistency of the filesystem.
+
+The first invariant is trivially upheld, since the server handles all incoming requests sequentially in a single "event handler loop".
+
+To ensure the second invariant, the server tracks which files are opened and
+with which permissions.
+For a client, trying to open a file, this means the following:
+If the client wants to open the file with write permissions, it is only granted
+access if the file is not currently opened.
+If the client wants to read the file, the file must not already be opened with
+write permissions.
+Note, that the server does not keep track which processes have opened files or
+where in the file they are. 
+
+There can be multiple readers at a time, the server keeps track of the number of
+readers accessing it, so it knows when the file is not being accessed anymore.
+The following snippet shows the just described handle kept by the server:
+
+\begin{minted}{c}
+struct file_handle {
+    char *path;
+    struct dir_entry dir_entry;
+    uint32_t num_accessors;
+    bool has_writer;
+};
+
+struct server_state {
+    bool up;
+    struct fat32_file_system fat;
+    collections_hash_table *open_files;  // A hash table of FD -> file_handle
+};
+\end{minted}
+
+\subsubsection{File Descriptors}
+The avid reader might have noticed that the RPC interface presented above uses
+file descriptors to identify files:
+Opening a file will return a file descriptor which then has to be passed back as
+arguments for other operations on that file.
+
+The server uses this file descriptor to find the file\_handle in its internal
+table.
+Since there should only every be at most one handle per file, the file
+descriptor that is handed out is deterministically calculated from the file
+name.
+It is calculated as an SDBM hash of the full file path.
+Collisions are resolved by comparing the file names and sequentially checking
+each increasing hash value.
+
+As a side-effect, this allows for fast lookup for file operations.
+
+\subsubsection{Drawbacks}
+However, it also has a significant drawback:
+Since file descriptors are deterministic a malicious process could access a file
+that was opened by another process without actually having to open it itself by
+computing the file descriptor using the hash function.
+
+This would easily circumvent the single writer policy that the server tries to
+enforce.
+
+A solution for this would be to hand out capabilities which then contain the
+hash to identify the file.
+Since Barrelfish uses capabilities for most things, this method would integrate 
+well with the existing ecosystem.
+
+We leave it as future work, since it was not in the scope of this project.
+
+\subsubsection{No SD detected}
+When the filesystem server is started it will try to access and setup the block
+device. If this succeeds, it then registers itself as a nameservice and responds
+to queries as described in this chapter.
+
+If the setup does not succeed, because, for example, there is no SD card
+present, the fileserver will still register itself with the nameservice system
+and respond to queries.
+However, it will respond to all queries with the error code FS\_ERR\_NOT\_FOUND.
+
+This mechanism is a placeholder, since the client library will always try to 
+connect to filesystem server upon setup.
+
+One alternative solution would be for the client to try to connect a fixed 
+number of times and then fail if it could not connect.
+This is unreliable and leads to unnecessary latency when starting a new process.
+
+A better solution would be to provide another service that maintains a list of
+mounted file servers (essentially providing a VFS).
+The filesystem servers would then register with this service when it successfully
+set up.
+And the client would query the "VFS" server to obtain the list of mounted
+file systems.
+
+
+\subsection{Client Side Library "fs/fatfs.h"}
+
+The client side library forms the glue between the general libc library and the
+RPC filesystem server.
+
+Upon initialization the client library will establish a connection to the
+filesystem server for "/sdcard".
+The library exposes a virtually identical interface to the ramfs library on which 
+it is based and provides a C wrapper for the servers RPC interface.
+It exposes the following interface to libc:
+
+\begin{minted}{c}
+errval_t fatfs_open(void *st, const char *path, int flags, fatfs_handle_t *rethandle);
+errval_t fatfs_create(void *st, const char *path, int flags, fatfs_handle_t *rethandle);
+errval_t fatfs_remove(void *st, const char *path);
+errval_t fatfs_read(void *st, fatfs_handle_t handle, void *buffer, size_t bytes,
+                    size_t *bytes_read);
+errval_t fatfs_read_file_to_frame(fatfs_mount_t st, const char *path, struct capref frame, size_t *bytes_read);
+errval_t fatfs_write(void *st, fatfs_handle_t handle, const void *buffer, size_t bytes,
+                     size_t *bytes_written);
+errval_t fatfs_truncate(void *st, fatfs_handle_t handle, size_t bytes);
+errval_t fatfs_tell(void *st, fatfs_handle_t handle, size_t *pos);
+errval_t fatfs_stat(void *st, fatfs_handle_t inhandle, struct fs_fileinfo *info);
+errval_t fatfs_seek(void *st, fatfs_handle_t handle, enum fs_seekpos whence, off_t offset);
+errval_t fatfs_close(void *st, fatfs_handle_t inhandle);
+errval_t fatfs_opendir(void *st, const char *path, fatfs_handle_t *rethandle);
+errval_t fatfs_dir_read_next(void *st, fatfs_handle_t inhandle, char **retname,
+                             struct fs_fileinfo *info);
+errval_t fatfs_closedir(void *st, fatfs_handle_t dhandle);
+errval_t fatfs_mkdir(void *st, const char *path);
+errval_t fatfs_rmdir(void *st, const char *path);
+errval_t fatfs_mount(const char *uri, fatfs_mount_t *retst);
+\end{minted}
+
+Since the server does not track the position of the cursor for each process, the
+client library has to do this itself.
+It keeps a list of file handles that contain basic information about the files.
+This includes, the position of the cursor and the filesize.
+The client library is responsible for updating its own view information when
+modifying the file.
+This does not introduce consistency problems, since there can only ever be one
+writer per file at a time (provided there is no malicious actor as described
+above).
+As a result, operations like fstat, fseek, and ftell do not require an RPC.
+The filesystem server only needs to be accessed to open and close files or to
+access information that is on the block device.
+
+\subsection{Performance of the complete stack}
+
+Finally, we want to take a look at the end to end performance of issuing a
+filesystem operation from userspace.
+
+We run the benchmark from a userspace program that is spawned after the filesystem server is set up.
+All measurements were run 30 times with a complete running OS.
+Append and read both operate on the first cluster (4KiB) of a file.
+
+\begin{figure}[ht]
+    \centering
+    \scalebox{0.6}{\includesvg{./figs/fs_fat32_e2e.svg} }
+    \caption{Performance of calling libc file operations: fopen, fwrite, fread, fclose}
+    \label{fig:fs_libc_e2e}
+% open_ms      5494.123975
+% append_ms    8656.162013
+% read_ms      3840.110825
+% close_ms        0.050854
+\end{figure}
+
+The results of this benchmark can be seen in figure \ref{fig:fs_libc_e2e}.
+We only inspect the most prominent operations for the sake of brevity.
+
+Opening a file takes $5494.12ms$, this is due to the fact that the call also needs to create the file.
+The implementation of fopen first checks if the file exists by trying to open it.
+When this fails, because the file does not exist yet, it triggers another RPC to create the file.
+This explains the additional delay compared to the direct create operation.
+
+Appending the first block to a file file takes $5494.12ms$, which includes communication overhead and traversing the directory to obtain the file handle.
+It is important to note, that libc does not try to write the entire cluster in one attempt. 
+Instead it breaks it into 1024 byte chunks and triggers RPCs for each.
+This explains the added overhead over the direct FAT32 Library call.
+
+Reading is subjected to the same chunking. It thus also introduces overhead resulting in a median latency of $3840.11ms$.
+
+Closing a file multiple orders of magnitude faster at $0.051$ since it does not require any block operations.
+It is just a lookup in a hashmap and an RPC.
+
+
+\section{Limitations}
+As can be seen in this chapter, there are still some limitation to our implementation
+\begin{enumerate}
+    \item The block driver is still incredibly slow
+    \item Loading ELF binaries is not implemented yet, binaries are quite large and would take an unacceptably  long time to load
+    \item Anything that modifies FAT entries is slow, since the block is written back every time an entry is modified.
+    \item We do not support timestamps.
+    \item The access control is very limited. Integrating it with the capability system would be desirable.
+    \item We currently do not support long names.
+    \item Currently every file open is interpreted as a write, we would just need to add flag parsing to allow simultaneous reads.
+    \item Open files are not automatically closed when the process dies.
+\end{enumerate}

@@ -1,0 +1,22 @@
+\chapter{Multi-core Support}
+In this chapter we talk about how we boot all cores of the CPU (we did the extra challenge). Most of the actual work was just following instructions from the book. Therefore, to not repeat what's already in the book we mostly discuss what we found interesting or important. The inter-core communication is covered in \autoref{sec:ump} and \todo{reference RPC}
+
+\section{Multicore Memory Managment}
+\label{sec:multicore_mem}
+In order to facilitate multiple cores we need a way of distributing memory to the secondary cores. We did not implement anything fancy. We statically give each core 256MiB. This value is not carefully crafted, but rather arbitrary. For 4 cores with 2GiB anything below 512MiB would make sense, but since most services run on core 0 we leave it with more memory. There is no dynamic reallocation of memory in our system, although as shown in later chapters we do support sending frame capabilities over cores.
+
+\section{Sending information over URPC frame}
+We need to pass additional information to the new core not contained in the \mintinline{c}{struct armv8_core_data}. The additional information we pass contains:
+\begin{enumerate}
+    \item \emph{Static memory} capability allocated for the core (discussed in the last \autoref{sec:multicore_mem}).
+    \item \emph{Bootinfo} capability to be able to spawn modules from secondary cores.
+    \item \emph{Multiboot module strings} capability needed to reconstruct the \mintinline{c}{bootinfo}.
+\end{enumerate}
+
+We could add these to the \mintinline{c}{struct armv8_core_data}. However, we found it cleaner to just pass the physical addresses and sizes of the capabilities over the URPC frame that gets shared with the new core. We use the first few bytes of the frame, filling it with the values on core 0. The spawned core then finds them at predefined locations. A less hard-coded solution would be to pass the information via an RPC over this URPC frame. We chose simplicity in this case.
+
+\section{Suspend/Resume}
+
+TLDR: We tried shit. Shit didn't work. xD
+
+We tried to make this work, for quite a while. Our solution we presented in the demo was calling \mintinline{c}{psci_cpu_off} to poweroff the CPU and after that we just freshly booted up the core as we would do it when we spawn it the first time. We understand that by doing this, we allocate quite a lot of memory again to boot up the second core instead of reusing the old data. This is why we decided to disable this feature again.

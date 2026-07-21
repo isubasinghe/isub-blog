@@ -1,0 +1,63 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Back from '../../components/Back.astro';
+import TechnicalReport from '../../components/TechnicalReport.astro';
+import { reports, type TechnicalReport as TechnicalReportData } from '../../data/reports';
+import andromedaHtml from '../../reports/andromeda-milky-way.html?raw';
+import bellyflopHtml from '../../reports/bellyflop-os.html?raw';
+import thesisHtml from '../../reports/incremental-data-parallel-graph-clustering.html?raw';
+import smithWatermanHtml from '../../reports/parallel-smith-waterman.html?raw';
+
+export function getStaticPaths() {
+  const reportDocuments: Record<string, string> = {
+    'andromeda-milky-way': andromedaHtml,
+    'bellyflop-os': bellyflopHtml,
+    'incremental-data-parallel-graph-clustering': thesisHtml,
+    'parallel-smith-waterman': smithWatermanHtml,
+  };
+
+  return reports.map((report) => {
+    const html = reportDocuments[report.slug];
+
+    if (!html) {
+      throw new Error(`No generated report document found for ${report.slug}`);
+    }
+
+    return {
+      params: { slug: report.slug },
+      props: { report, html },
+    };
+  });
+}
+
+interface Props {
+  report: TechnicalReportData;
+  html: string;
+}
+
+const { report, html } = Astro.props;
+---
+
+<BaseLayout title={report.title} description={report.description}>
+  <div class="report-toolbar">
+    <Back url="/reports" />
+    {report.sourceUrl && (
+      <a class="source-link" href={report.sourceUrl} rel="external">
+        Source code ↗
+      </a>
+    )}
+  </div>
+  <TechnicalReport html={html} />
+</BaseLayout>
+
+<style>
+  .report-toolbar {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .source-link {
+    font-size: 0.9rem;
+  }
+</style>

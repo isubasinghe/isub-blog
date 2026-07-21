@@ -1,0 +1,78 @@
+\chapter{Processes}
+
+\section{Spawnstore}
+\subsection{System Unique Domain Identifiers}
+It is critical for the system to issue out unique domain identifiers as this functionality is needed for commands such as `ps'. In order to address this need we dedicated the top 8 bits of a domain identifier to the core number and the bottom 24 bits to a core level identifier which we incremented with each spawned domain. This is explain also in more detail in \autoref{sec:serviceid}.
+
+\subsection{Tracking Spawned Domains}
+In order to keep track of any spawned domains, we issue each kernel's `init' domain with a data structure called the `spawnstore`. This is treated as a single source of truth regarding the status of active processes spawned by the relevant `init' domain. Please note that that the `spawnstore' does not care for domains spawned by `init' domains in other cores. This obviously presents a challenge when querying for all the domains in the entire system, but we resolved this by simply querying every core's `init' process and then accumulating the results. 
+
+\subsection{Terminating Domains}
+In order to keep the `spawnstore' accurate, it becomes critical to ensure that we can ``hook'' into the exit event of any given process and notify the `spawnstore'. This was fairly trivial to attempt as we were able to simply overwrite the existing \mintinline{c}{libc_exit} call to inform the `spawnstore' that our domain has just died. Here, we simply issued a \mintinline{c}{InitProcessInformDeathRequest} RPC call to the `init' process. The exiting domain then spins while awaiting the `init' process to first remove the domain from the `spawnstore' and then remove it from the scheduler. 
+
+\section{Domain Spawning}
+
+\subsection{Setting up the Capability Space}
+One of the first things that happen when spawning a process is that we setup the child's capability space, as this is critical for the child process to do almost anything. The task of setting up the CSpace itself is fairly trivial, thanks to the various helper functions. However, figuring out how the capability space worked was challenging. It was essential to set up the \mintinline{c}{L1_CNODE} in the child process as it was necessary for a few other ``child'' capabilities to also be setup as well as for having a capability space where newly allocated capabilities could be stored in. In the case that we did not do this, the child domain would not have been able to allocate memory as in order to allocate memory there must be a valid `CSpace' and to create a valid `CSpace' there must be some memory. After creating an \mintinline{c}{L1_CNODE} along with an \mintinline{c}{L2_CNODE}, we now can map in the various critical capabilities into the child process. The child expects capabilities for LMP, the dispatcher, command line arguments and quite a few other capabilities. 
+
+\subsection{Setting up the Virtual Address Space}
+In accordance with the `self-paging' technique deployed in Barrelfish, the child process also needed the relevant information to enable `self-paging' in its address space. This means that we need to pass in a root page table so that the child can continue to map in relevant page tables. This is achieved through mapping in a capability of type \mintinline{c}{ObjType_VNode_AARCH64_l0} into the child process. The reason the `init' domain needs to perform this action is due to the fact that the child is not capable of creating a new capability since it cannot map the associated memory region. It ultimately creates a dependency loop like in the above case with the capability nodes. 
+
+\subsection{ELF Loading}
+\label{sec:elf}
+The initial process of ELF loading, is to look up the memory region of a corresponding binary file. This was done through the \mintinline{c}{multiboot_find_module} function which iterated through the existing modules and to obtain the module that matched the name of the requested module. Loading the ELF file after this, is mostly as simple as calling the \mintinline{c}{elf_load} function. This mapped the ELF segments to both the parent and the child domains, as a result of this it was also important to unmap each segment after the ELF binary was completely loaded. The function signature of the ELF setup is as follows, note the second argument as it is important for later. 
+\begin{minted}{c}
+static errval_t setup_load_elf(struct spawninfo *si, void **got_base_in_child_vspace)
+\end{minted}
+
+\subsection{Setting up the Dispatcher}
+One of the last steps performed when spawning a new domain is to setup the dispatcher. This process involves allocating a frame for a dispatcher capability and then mapping it over in the child's capability space at the \mintinline{c}{TASKCN_SLOT_DISPFRAME} slot. Note the function signature for ELF loading from section \ref{sec:elf} , we use the `got\_base\_in\_child\_vspace' (or at least the pointer used here) and update the dispatcher data structure to reflect the location of the `.got' section of the ELF file. 
+
+\subsection{Spawning with Arguments}
+Like most other operating systems, we allow our modules to be spawned in with some arguments, in order to support this functionality we had to map in a new capability to the child in a specific slot in it's capability space. This capability for the argument space was simply just 4096 bytes. However this was enough for our use case. We also map this capability to our virtual address space, this was done so that we can simply iterate over the arguments and write them to memory.
+
+\subsection{Spawning with Capability Arguments}
+\label{sec:spawn_capargs}
+There are certain domains that may require spawning with additional capabilities attached. It would be irresponsible to hand these out for every spawned process, therefore we implemented the capacity to map in up to 3 capabilities as ``Capability Arguments''. These ``Capability Arguments'' are mapped into a reserved area of the capability space. This feature was needed for the user level UART driver used to implement the shell as it required not just the UART device capability but also the GIC device capability. Please note that there is an expectation from the spawned domain that certain  capabilities are in certain regions of the capability space, from here the user level process typically just maps these devices into its virtual address space. The interface for spawning with capability arguments now reflects the following function signature as a result. 
+\begin{minted}{c}
+errval_t spawn_load_argv_argcn(int argc, char *argv[], struct spawninfo *si,
+                               domainid_t *pid, struct capref argcn0,
+                               struct capref argcn1, struct capref argcn2)
+\end{minted}
+While the function signature expects exactly 3 capability arguments, it is still possible to send less by simply sending a \mintinline{c}{NULL_CAP}. This capability is detected when setting up the capability space and then the process of mapping it into the child's capability space is avoided. 
+
+
+\subsection{Passing Paging State to Child}
+
+To pass a paging state to the child, we do the following on a high level: We copy all the paging state into a new continuous memory area and fix all pointers to be relative to the start of this region. In the child process, we then walk through the paging state again and fix the relative addresses to its virtual memory address. 
+
+To do this we implemented the module Paging State Rebase, which implements the following interface:
+\begin{minted}{c}
+size_t rebase_get_page_table_storage_size(struct page_table *pt);
+errval_t rebase_to_relative_frame(struct paging_state *pst, void *buf, size_t buf_size,
+                                  struct slot_allocator *slot_alloc);
+void reconstruct_page_table(struct page_table *pt)
+\end{minted}
+
+The tricky part here is to allocate enough space to fit the paging state in. \mintinline{c}{rebase_get_page_table_storage_size()} only gives the current storage size of the shadow paging table. But the moment we map a new area of memory (the place to put the serialized version of the shadow page table), we might change the storage size of the shadow page table again. We came up with this sophisticated schema that tries to calculate the number of possibly additional storage pages needed for adding the memory region. We do realize that this should be an iterative process trying to find a stable point, but this works for us. Apparently the \mintinline{c}{ *= 2} is generous enough:
+\begin{minted}{c}
+size_t extra_ptables
+        = num_pages / PTABLE_ENTRIES + num_pages / (PTABLE_ENTRIES * PTABLE_ENTRIES)
+          + num_pages / (PTABLE_ENTRIES * PTABLE_ENTRIES * PTABLE_ENTRIES) + 3;
+extra_ptables *= 2;
+\end{minted}
+This tries to calculate for the worst case scenario where we walk over a page table boundary at every level. The rest of the implementation fixing pointers is then fairly simple.
+
+\paragraph{Sidenote}
+We are able to get all the paging state in the child and e.g. print it out. However, we didn't actually implement using this paging state in the child.
+
+
+\section{Limitations}
+\subsection{Timeliness of system wide process gathering}
+We have to communicate with every core's `init' domain to get the system wide process information. This means that 
+each core will get it's request at slightly different times. This means that it is possible 
+for a set of entries (let's say the replies from core 0) to not reflect what it's values would have been, by the time another set of entries arrived (for example on core 3). We could potentially solve this through some synchronization for these specific requests but we chose not to, as it is unlikely that the impact of this issue would be big enough to be of concern. 
+
+\subsection{Size of arguments}
+The space allocated for the arguments is simply 4096 bytes, it is fairly obvious as to why this is a limitation, we simply cannot use anything 
+more than this figure. However, given our time limitations along with the fact that every argument our shell supports will sit comfortably within this limitation, it simply did not make sense to care about this. 

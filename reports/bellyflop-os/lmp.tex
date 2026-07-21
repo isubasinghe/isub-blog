@@ -1,0 +1,202 @@
+\chapter{Lightweight Message Passing}
+For inter-domain communication within one core, Barrelfish, and consequently our project, uses LMP
+messaging. In this chapter, we mostly discuss how we implement the following interface which supports sending and receiving buffers of arbitrary sizes over LMP:
+\begin{minted}{c}
+// Send a buffer and a capability.
+errval_t aos_rpc_lmp_send(struct lmp_chan *chan, uint8_t *buf, size_t buflen,
+                          struct capref cap);
+
+// Receive a buffer and a capability.
+errval_t aos_rpc_lmp_recv_blocking(struct lmp_chan *chan, uint8_t **buf_uint8,
+                                   size_t *buflen, struct capref *cap);
+\end{minted}
+
+Note that there can only be a single writer and a single reader, otherwise the messages loose integrity.
+We implement a similar interface also for UMP for inter-core communication. This is needed to support RPCs with arbitrary request and response lengths. The RPC layer is described in detail in chapter \ref{sec:rpc}.
+
+\section{Messages of arbitrary size}
+The underlying endpoint of a \mintinline{c}{struct lmp_chan} supports
+sending a capability and at most $32$ bytes as seen on the following snippet:
+\begin{minted}{c}
+inline errval_t
+lmp_ep_send(struct capref ep, lmp_send_flags_t flags, struct capref send_cap,
+            uint8_t length_words, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
+            uintptr_t arg4)
+\end{minted}
+
+
+
+The book describes 4 approaches to sending big messages over LMP, most of them involving some level of management of shared memory
+between the two communicating domains. We decided to use the most straightforward approach which does not
+require any explicit memory sharing from our side. We split the big message into multiple smaller
+ones of sizes at most $32$ bytes.
+
+\begin{figure}[ht]
+    \centering
+        \scalebox{0.7}{
+            \includesvg{./figs/lmp_msg.svg}
+        }
+    \caption{Splitting a big message into smaller LMP messages}
+    \label{fig:lmp_msg}
+\end{figure}
+
+For the receiver to be able to allocate a buffer of appropriate size, we use the first word of the first LMP
+message to encode the length of the buffer. This can be seen on the figure \ref{fig:lmp_msg}, where the buffer length \mintinline{c}{buflen} is part of the first LMP message and afterwards the buffer is split over multiple LMP messages, padded with zeroes.
+
+Note that typically for a protocol like this one would need to
+specify endianness and bit-ordering, but the messages are passed within a single CPU so we assume that
+endianness and bit-ordering are consistent\footnote{We're sure there are some obscure ways to break this assumption on some architectures and maybe even ARM, but it just worked out of the box so we didn't dig deeper.}.
+
+Since we did not implement any other approaches we do not provide a benchmark that would compare them. Once we removed acknowledgments after each LMP message (see next section), the performance was good enough during the rest of the course.
+
+\subsection{SYNC/YIELD flags and tuning LMP buffer size}
+\label{sec:lmp_sync_and_buf}
+
+Each LMP message is send with a set of flags. The interesting ones are:
+\begin{itemize}
+    \item \mintinline{c}{LMP_FLAG_SYNC}: Yield to target after successful transfer.
+    \item \mintinline{c}{LMP_FLAG_YIELD}: Yield to target if the message is undeliverable.
+\end{itemize}
+The naming of the flags is a bit unfortunate. We used \mintinline{c}{LMP_SEND_FLAGS_DEFAULT} (containing both \mintinline{c}{SYNC} and \mintinline{c}{YIELD}) for the majority of the course. However, this means that for big messages that are split into many smaller LMP messages, there's a preemption after each successful message due to the \mintinline{c}{SYNC} flag. 
+%TODO plot.
+
+\begin{figure}[ht]
+    \centering
+         \subfloat[\centering ]{{\scalebox{0.35}{\includesvg{./figs/lmp_bench_small.svg} }}}
+         \subfloat[\centering ]{{\scalebox{0.35}{\includesvg{./figs/lmp_bench_big.svg} }}}
+
+    \caption{Graphs showing benchmark of sending big/small messages. All runs were repeated 10 times and the bars contain confidence intervals. Default buffer size of endpoints is 2 LMP messages, optimized is 10 messages.}
+    \label{fig:lmp_bench}
+\end{figure}
+
+
+In a similar spirit, for big messages it turned out crucial to increase the default LMP buffer size (\mintinline{c}{DEFAULT_LMP_BUF_WORDS}) which is equal to $2$ LMP messages. This means that there needs to be a preemption after every two messages. This is probably enough when using a different approach for sending big messages. However, given that we simply split big message into smaller ones, a small buffer meant a significant performance hit.
+
+Figure \ref{fig:lmp_bench} shows our benchmarks of SYNC and BUF (buffer) optimizations. The plot on the left shows that the optimizations do not affect small messages which fit into a single LMP message. This is expected since in all three experiments there is a preemption after the single LMP message is sent. However, the difference for bigger messages, 100B or 4 LMP messages in our case, is in orders of magnitude. Truth be told, while it is clear that many preemptions can be saved by these optimizations, we did not dig deeper into why is the difference so big (note that the y-axis is log scale). 
+
+\begin{figure}[ht]
+    \centering
+        \scalebox{0.8}{\includesvg{./figs/lmp_really_big.svg}}
+    \caption{Graph showing RTT of a single message with different size using LMP with SYNC and BUF optimization. Buffer size for both LMP endpoints is 10 messages.}
+    \label{fig:lmp_rttbad}
+\end{figure}
+
+We also performed an RTT benchmark with different sizes using SYNC and buffer optimizations. The Figure \ref{fig:lmp_rttbad} shows very poor scaling of the implementation with SYNC and buffer optimizations. Sending 8KiB message takes 6 seconds. We attribute this to the big number of context switches that need to happen if the message is bigger than endpoints' buffers.
+
+Concretely, we set the buffer size to 10 messages ($10 \cdot 32 = 320B$) and observe no slowdown for messages of smaller sizes than $320B$. The degradation starts with the 512B message.
+
+\subsection{Yield in blocking RECV optimization}
+When a big message is send, the receiver gets scheduled after the sender fills the buffer. Once the receiver reads the buffer, it just actively polls, waiting for new data. This can be trivially optimized by yielding to the sender when there's no data to receive:
+\begin{minted}{c}
+errval_t recv_single_lmp_msg_blocking(struct lmp_chan *chan,
+                                      struct lmp_recv_msg *rcvbuf,
+                                      struct capref *capref)
+{
+    // The yield-in-blocking-RECV optimization.
+    while(!lmp_chan_can_recv(chan)) {
+        thread_yield_dispatcher(chan->remote_cap);    
+    }
+    
+    errval_t err;
+    do {
+        err = lmp_chan_recv(chan, rcvbuf, capref);
+    } while (err == LIB_ERR_NO_LMP_MSG);
+}
+\end{minted}
+
+With this optimization, we were able to get another 1000x speedup for big messages. Note that compared to the previous figure, the y-axis below is in microseconds. There is a noticeable jump in the graph for messages bigger than 2048. We did not dig deeper into this. Our guess is that the scheduler preempts to a different domain. 
+
+\begin{figure}[ht]
+    \centering
+        \scalebox{0.8}{\includesvg{./figs/lmp_really_big_opt.svg}}
+    \caption{Graph showing RTT of our final implementation using SYNC, BUF, and RECV optimizations. Buffer size for both LMP endpoints is 10 messages. The mean of 100 runs is shown on the graph.}
+    \label{fig:lmp_rttgood}
+\end{figure}
+
+\begin{hindsight}
+We ended up satisfied with the API we chose and the performance we obtained for the arbitrary-sized messages over LMP. We decided to not optimize further the big messages (by e.g., sending over frames) because it did not show up as a bottleneck while working on the project.
+
+It is a bit sad that as we'll see in the RPC section we ran into a bug which caused all RPC calls to take around 80ms. We were not able to resolve this bug and therefore our optimized LMP layer did not come to full fruition. 
+\end{hindsight}
+
+\subsection{The art of ACKs}
+%TODO: Do we want to actually say something about the ACKs? As far as I can see from the code they were never needed because when sending a capability, there's a \mintinline{c}{SYS_ERR_LMP_CAPTRANSFER_DST_SLOT_OCCUPIED} error during receive. When YIELD flag is used and this error occurs, the sender yields to the receiver so that they can receive the capability that's in the slot...
+In the beginning, we used acks for every LMP package, then got rid of it by only acking the whole message. And then realizing that this is only needed for caps, and then realizing that there is the error \mintinline{c}{SYS_ERR_LMP_CAPTRANSFER_DST_SLOT_OCCUPIED} so we got rid of all the acks in the LMP protocol.
+
+\section{Memory server without deadlocks and infinite loops} \label{sec:mem_server}
+The first use case for our LMP messaging was a Memory server. We decided to not decouple it from the \mintinline{c}{init} domain like Barrelfish does. It was mainly because we found it to be potentially a lot of work for not so much gain, since the decoupling would not bring any new functionality or speedup.
+
+Given that our Memory server runs in \mintinline{c}{init} where other requests are being served as well (e.g., for \mintinline{c}{serial}, \mintinline{c}{process}, etc), we need to ensure that memory requests are always served regardless of utilization of other servers in \mintinline{c}{init}. We achieve this by handling memory requests on a separate waitset in a separate thread.
+
+As described in the book, when requesting memory from the Memory server it's easy to end up requesting from within a request. We identified two places where this was happening initially in our code. The code looked roughly as follows:
+\begin{minted}{c}
+errval_t aos_rpc_get_ram_cap(struct aos_rpc *rpc, size_t bytes, size_t alignment,
+                             struct capref *ret_cap, size_t *ret_bytes)
+{
+    thread_mutex_lock(&rpc->mutex);
+    
+    // Send request
+    aos_rpc_lmp_send(&rpc->chan.lmp, "ram_request_params", 18, NULL_CAP);
+    
+    // Receive the capability and returned bytes.
+    uint8_t *retbuf;
+    size_t retbuflen;
+    aos_rpc_lmp_recv_blocking(&rpc->chan.lmp, &retbuf, &retbuflen, ret_cap);
+    
+    *ret_bytes = *retbuf;
+
+    thread_mutex_unlock(&rpc->mutex);
+}
+
+errval_t aos_rpc_lmp_recv_blocking(struct lmp_chan *chan, uint8_t **buf_uint8,
+                                   size_t *buflen, struct capref *cap)
+{
+    struct lmp_recv_msg rcvbuf = LMP_RECV_MSG_INIT;
+    lmp_chan_recv(chan, &rcvbuf, cap);
+    
+    // Malloc buffer
+    *buf_uint8 = malloc(rcvbuf[0]);
+    
+    // Allocate new slot for receiving
+    if (!capref_is_null(*cap)) {
+        lmp_chan_alloc_recv_slot(chan);
+    }
+    
+    // Receive rest of the message (omitted)
+}
+\end{minted}
+
+First, notice that \mintinline{c}{aos_rpc_lmp_recv_blocking()} uses \mintinline{c}{malloc()} to allocate a receive buffer. Accessing it might trigger another nested memory request. To mitigate this, we could either ensure that the response message never contains a payload or ensure that the payload is limited and provide a static buffer. 
+We chose the second approach because it aligns better with the RPC architecture that'll be introduced in the chapter \ref{sec:rpc} where we always need to send (albeit small) headers for requests and responses. Moreover, this way we can forward errors from the server, for example when a domain hits its memory quota (see \autoref{sec:mem_qouta}).
+
+Second, note that \mintinline{c}{struct lmp_chan} has a single slot for receiving a capability. We chose to refill this slot inside of \mintinline{c}{aos_rpc_lmp_recv_blocking()}. This might lead to a nested Memory server call if the slot allocator needs more memory. There are at least two ways to tackle this, one is to allocate an empty slot before the call to \mintinline{c}{aos_rpc_lmp_recv_blocking()} and thus avoid allocating the slot during receiving. The other one is to allocate the slot after the receiving. We chose to go with the preallocation:
+\begin{minted}{c}
+errval_t aos_rpc_get_ram_cap(struct aos_rpc *rpc, size_t bytes, size_t alignment,
+                             struct capref *ret_cap, size_t *ret_bytes)
+{
+    // Preallocate an empty slot for receiving.
+    struct capref empty_slot;
+    slot_alloc(&empty_slot);
+    
+    thread_mutex_lock(&rpc->mutex);
+    
+    // Send request
+    aos_rpc_lmp_send(...);
+    
+    // Receive capability
+    aos_rpc_lmp_recv_blocking_with_empty_slot(..., ret_cap, empty_slot);
+    
+    thread_mutex_unlock(&rpc->mutex);
+}
+\end{minted}
+
+Note that the empty slot needs to be allocated \emph{before} the lock over RPC is acquired because it might trigger a memory request itself. However, this scenario begs another question: If the  \mintinline{c}{slot_alloc()} on the line 6 triggers a memory request, the very same code will be execute during this request and therefore \mintinline{c}{slot_alloc()} will be called again, lacking memory that we are currently trying to provide. Did we end up in an infinite loop?
+
+Luckily, the answer is \emph{no} because the default slot allocator (\mintinline{c}{two_level_slot_allocator}) has an internal reserve of slots which gets used once the "normal" slots run out. Therefore, the \mintinline{c}{slot_alloc()} from the nested memory request will succeed. Well, at least in most cases, it can happen that some other thread uses up all the reserve and then we're out of luck. We did not deal with this case.
+
+\subsection{Enforcing a per-domain memory quota}
+\label{sec:mem_qouta} 
+
+We support limiting the amount of memory a domain can get from the Memory server. The amount is controlled by a global define \mintinline{c}{DEFAULT_MEMORY_QUOTA_B} and defaults to 128MiB. Each memory capability returned to a domain is stored in the respective \mintinline{c}{struct spawninfo} of the domain. This way, we can clean up all memory that a domain requested once it exists.
+
+Cleaning up the resources is not so straightforward, though, as for example memory frame's might be shared across multiple domains. We don't clean up the memory right now since nobody implemented the Capability project.

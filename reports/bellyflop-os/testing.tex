@@ -1,0 +1,48 @@
+\chapter{Testing Framework}
+
+Testing the code you write is probably just as important as actually writing the code.
+This is especially true when you are working on a complex system with many interacting components like an Operating System.
+
+We therefore want to start by showing the Testing Framework we created for this project.
+It proved useful throughout the different chapters of the course because it greatly simplified and standardized the way we would write tests.
+
+% We created some macro magic that lets you create and run tests by doing this:
+It uses some "macro magic" to create and group different test cases together.
+These groups of commands can then be executed by using the \mintinline{c}{RUN_TESTS(<group>)} command.
+It shows you if the tests succeeded or failed, and, if they failed, where and why they failed.
+
+\begin{minted}{c}
+CREATE_TEST(test_name1, group_name, 
+{
+    errval_t err;
+    err = ...
+    TEST_REQUIRE_OK(err);
+    err = ...;
+    TEST_REQUIRE_FAIL_WITH(err, SOME_ERR);
+})
+
+CREATE_TEST(test_name2, group_name, 
+{
+    // This makes a test fail but doesn't abort the execution.
+    TEST_CHECK(1 == 2);
+    // This makes a test fail and aborts execution of this test (but not the group).
+    TEST_REQUIRE(1 == 2); 
+})
+
+// ...
+
+void run_testing(void) {
+    RUN_TESTS(group_name);
+}
+\end{minted}
+This is how it looks like when a test fails (in red):
+\begin{minted}{sh}
+/lib/grading/group_name_tests.h:12: 1==2 failed
+/lib/grading/group_name_tests.h:13: 1==2 failed
+Test test_name2 in group_name failed.
+1/8 tests in group_name failed.
+\end{minted}
+This is how it looks like when all tests pass (in green):
+\begin{minted}{sh}
+All 8/8 tests in group_name succeeded.
+\end{minted}

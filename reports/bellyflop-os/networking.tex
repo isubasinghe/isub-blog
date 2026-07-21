@@ -1,0 +1,433 @@
+\chapter{Networking}
+In the following chapter, we discuss our networking stack. This stack provides drivers for the Data link layer, the network layer, and the transport layer.
+
+Specifically, we implement ARP, IP, ICMP echo reply, UDP, and TCP and afterwards expose ARP, UDP, and TCP interfaces for user processes.
+
+The following explores our design decisions and the implementation.
+
+\section{Context Objects between layers}
+
+Because the networking stack consists of different layers that hand data up or down, it is important to think about how to avoid copying the whole packet from one layer to the next layer. 
+This is really easy for incoming packets, since we can just hand a pointer to the payload to the layer above. 
+For sending packets this is a bit more tricky, in order to send a packet it has to be in the devices' memory continuously allocated. To solve this problem, if a layer wants to send data it will ask for a context object of the layer below and will then start writing into the payload of this context object. After all data has been written, this context object can be returned to the layer below such that it can actually be sent. This means even though in the abstraction we start building the packet at the highest level, we are actually starting with the lowest level and then building the packet all the way up.
+We will use this approach all the way through the network stack, to have an only 1 copy network stack (the one copy is at the end of the stack to or from the user to leave the networking module).
+
+\section{Device Management}
+
+\subsection{Devq RX Manager}
+
+The Devq RX Manager is not an actual abstraction in the code itself since it is very simple. In order to read from the network, we dequeue a buffer from the RX device queue, call the Ethernet packet handler, and then return the buffer back to the RX queue.  
+
+\subsection{Devq TX Manager}
+
+The Devq TX Manager (struct devqtx\_manager) manages the TX device queue of the enet controller. It is an abstraction around the queues that lets you conveniently get a pointer, such that the layer above can just write the bytes of the packet into the buffer. When the layer above is done, it can just pass that pointer and a size to the Devq TX Manager to enqueue and eventually send the packet over the network.
+
+In the initialization of the Devq TX Manager, we create a linked list using statically allocated memory with one node for each slot in the Devq, this is possible since the size is known at compile time. We then create a list node for each block of memory that is handled by the Devq. For each of this block we can find the linked list node just by looking at the block's address since the nodes of the linked list are store inside an array. 
+
+The Devq TX Manger needs to be thread safe since for example answering an ARP request and sending a UDP packet might happen concurrently. Devqs are not thread safe, this is why we have a mutex around the 2 methods exposed to the other layers.
+Next we will explain how we can get a free buffer and then send it. 
+\subsubsection{Getting a free buff} 
+
+In order to get a free buff, we just look in our linked list and take the head out of the list and return the pointer stored in there to the caller. 
+If the linked list is empty, we first have to recover free buffs. 
+
+\subsubsection{Recovering free buffers}  
+
+To recover free buffers we simply call devq\_dequeue while there are still elements in the queue to get all the buffer that the device does not need any more. 
+Now we can just reinsert the linked list node that can be found in memory just by its buffer address. 
+This was the idea behind storing the linked list in an array, since we know the total set of elements and expect them to be eventually in the queue again. 
+The big advantage is that whenever we retrieve and return a buffer to the device, we do not have to do a malloc or free in order to maintain the nodes of the linked list.
+
+\subsubsection{Sending a buff}
+
+Sending a free buffer now is super easy: We only have to call devq\_enqueue to give the buffer to the device queue.
+
+
+\section{Ethernet Layer}
+
+\subsection{Handling incoming packets}
+The Ethernet layer provides the following interface to handle incoming packets and get the MAC address of the device in case another layer needs it.
+\begin{minted}{c}
+void handle_ethernet(struct devq_buf* buf, size_t packet_length);
+struct eth_addr ethernet_get_mac(void);
+\end{minted}
+The Ethernet handler gets invoked by the Devq RX Manager for every packet that is received on the device and checks if the destination MAC address is a broadcast or the address of the device. If the packet is for this device, then the Ethernet handler looks at the ether type and calls the corresponding packet handler of the layer above with a pointer to the payload of the Ethernet packet as an argument.
+
+\subsection{Sending Ethernet Packets}
+
+In order to send an Ethernet packet, an Ethernet Send Context has to be created.
+This is an object that holds a pointer to an Ethernet header. This Ethernet header as has a file contains a filed payload that point to the payload.
+This context is retrieved by asking the Devq TX Manager for a new buffer and then casting it to the Ethernet header type and setting the source and destination MAC address, and the Ether Type as specified.
+Then the layer above can write to the payload buffer as it wishes and send the context by providing the payload length. This send method just forwards the call to the Devq TX Manager such that the packets actually gets send out. This is the interface provided by the ethernet layer.
+
+\begin{minted}{c}
+struct eth_hdr {
+    struct eth_addr dst;
+    struct eth_addr src;
+    uint16_t type;
+    uint8_t payload[];
+} __attribute__((__packed__));
+
+struct eth_send_context {
+    struct eth_hdr* pkt;
+};
+
+errval_t ethernet_get_context(
+    struct eth_send_context *ret, struct eth_addr dst, uint16_t type);
+    
+errval_t ethernet_send_context(
+    struct eth_send_context context, size_t payload_length);
+\end{minted}
+
+
+\section{ARP Layer}
+
+The ARP layer implements the standardized ARP requests and responses. 
+The layer stores one MAC address for an IP address inside a HashMap to keep track of them. When the ENET module is started, the ARP layer sends out 3 Probe request to find out if its static IP is already taken. If no answer is received, it claims the IP address by sending a Gratuitous ARP request. Whenever an IP packet is received from an unseen IP, the ARP cache is updated, this is an optimization such that we don't need to do an ARP request before we want to reply to something. To contact a new not before seen IP address, the ARP layer has to be instructed to do an ARP request for the specified IP address. When the ARP layer later gets a reply from the network, it updates its HashMap accordingly. This is the exposed interface of the ARP layer.
+\begin{minted}{c}
+errval_t arp_probe(void);                          // Announces/ Claims own static IP address 
+errval_t arp_request(ip_addr_t ip_addr);           // Starts an ARP request for a gives IP address
+errval_t arp_handle_packet(struct arp_hdr *pkt);   // Handles incoming ARP packets
+struct eth_addr *arp_lookup_mac(ip_addr_t ip_addr);// Looks up a given IP address in the arp_cache
+\end{minted}
+
+
+\section{IP Layer}
+The IP layer supports a similar context style interface like the other layers as well.
+\begin{minted}{c}
+struct ip_context {
+    struct eth_send_context __eth_context;
+    struct ip_hdr *pkt;
+};
+
+errval_t ip_handle_packet(struct ip_hdr *ip, size_t packet_length);
+errval_t ip_get_send_context(ip_addr_t dst, uint8_t protocol, struct ip_context *ret);
+errval_t ip_send_context(struct ip_context context, size_t payload_length);
+\end{minted}
+
+The IP layer has a simplistic design. \mintinline{c}{ip_get_send_context()} gets an Ethernet context and wraps it inside and IP context and sets all fields (excluding length and checksum) in the IP header. \mintinline{c}{ip_send_context()} then sets the length, computes the checksum and forwards the context to the Ethernet layer. \mintinline{c}{ip_handle_packet()} handles incoming IP packets and forwards the payload to the next higher layer accordingly.
+
+\section{ICMP}
+ ICMP works from inside the Enet module to achieve low latency. It works by copying the request packet into the send context and changing the ICMP type to \mintinline{c}{ICMP_ECHO_REPLY} and recomputing the checksum. Then the packet is sent out again (by using the IP get and send context methods).
+ 
+ \paragraph{Sidenote}
+ In order to print incoming ICMP Echo messages, one can comment out the \\ \mintinline{c}{#define PRINT_PING_DEBUG} inside the "enet/ip.c"
+
+
+\section{UDP Layer}
+
+The UDP layer implements a similar context style interface as other lower layers.
+\begin{minted}{c}
+errval_t handle_udp_packet(struct udp_hdr* udp_hdr, ip_addr_t src_ip);
+
+struct udp_context {
+  struct ip_context __ip_context;
+  struct udp_hdr* pkt;
+};
+errval_t udp_get_context(uint16_t dst_port, uint16_t src_port, ip_addr_t dst_ip, 
+                         struct udp_context* ret);
+erval_t udp_send_context(struct udp_context context, size_t length);
+\end{minted}
+
+When getting the context, the first thing that is done is getting an IP context and making the UDP header pointer point to the payload of the IP packet. Then we can set the source and destination port.
+
+To send the context, we compute the UDP checksum using the pseudo IP header. The pseudo IP header can be accessed, since we do have the IP context with the properly set header fields already. After that, we just send the IP context with the corresponding payload length.
+
+\section{TCP Layer}
+
+\subsection{Session Management}
+
+TCP sessions are managed by a HashMap from the triplet (source port, destination port, destination ip) to the session state. The sessions state contains things like the current Sequence and Acknowledgment number we are at, but also the Send Window and a session mutex. The session mutex is required since we might send and receive packets for one session concurrently. So whenever we get the current connection session state for an incoming packet, the first thing we do is acquiring the session lock (obviously the HashMap is also guarded by its own mutex). 
+
+\paragraph{Create}
+
+Sessions are created when starting a Handshake or answering to a Handshake if running a TCP server. The sequence number gets set to a random number (currently always 42), and the session state will be inserted into the HashMap.
+
+\paragraph{Round Trip Time Measurement}
+
+When creating a session, the system time is also saved in the session state such that when the [SYN,ACK] or the [ACK] of the handshake get received, we can calculate the round trip time of the session and safe it in the session state. This is used for retransmission of packets. 
+
+\paragraph{Lookup}
+
+Whenever we receive a packet, the we lookup the session in the HashMap and edit the state accordingly.
+
+\paragraph{Close}
+
+On completing of a Finshake, the session gets destroyed and freed.
+
+\subsection{Retransmissions}
+
+Since TCP requires packets to be resent when not acknowledged, we need to store packets till they got acknowledged. We store packets in one ring buffer per connection. Each of the slots in the ring buffer have a state that indicate if they are in use or not and a time field to indicate when a packet has been inserted into the buffer. Whenever we send a packet, we also copy the TCP header + payload into the ring buffer and set the slot to used. Whenever we receive an acknowledgement, we set all slots to in this ring buffer to unused that are included with this ack. 
+
+In order to actually retransmit packets, we set up a periodic event with the included deferred library. This periodic event walks over each session and checks the send ring buffers to retransmit packets that were sent longer than then Round Trip Time (of the session) times \mintinline{c}{TCP_RETRANSMISSION_RTT_MULTIPLIER} long ago.
+
+\subsection{TCP Servers}
+In order to handle TCP servers, we just whitelist ports with a HashMap to allow a port to accept connections and answer to handshakes.
+
+
+
+\section{User Level Network Sockets}
+
+To communicate with the network layer the ENET Module runs a nameservice called "net-scokets". This nameservice can then be used by a user's process to do ARP requests, open UDP sockets, connect to a server over TCP, or create a TCP server.  
+
+\subsection{ARP Request}
+
+A user can initiate an ARPC RPC to the netsocket server to make sure, when sending a UDP packet to a new unseen IP, that the MAC address is known. Otherwise, it might happen that UDP send returns an MAC unknown error. This can be done by \mintinline{c}{net_socket_arp_request()}. TCP takes care of ARP requests on its own, and UDP can still answer to incoming packets since the network stack will remember the MAC.
+
+\subsection{UDP Sockets}
+
+This is how the user code looks to create a UDP socket and send a string over it.
+\begin{minted}{c}
+struct udp_socket udp_socket;
+udp_socket_create(&udp_socket, 1234);
+udp_socket_send(&udp_socket, str_to_ip_addr("10.0.2.2"), 
+                1235, "Hello world\n", 12);
+udp_socket_close(&tcp_socket);
+\end{minted}
+
+\paragraph{UDP Socket Creation}
+To open a UDP socket on a port, the user process sends a RPC to open a UDP Socket to the ENET module. This RPC contains the port we want to create the socket on and a Capability to the UMP Frame used to communicate over that socket (which needs to be created by the user). The netsocket server then (after checking if the port is free) adds this UMP frame to a HashMap such that it can later be found to forward packets from the network onto.
+
+\paragraph{UDP Packet forwarding}
+The netsocket server receives all UDP packets from the network and can then find the corresponding UMP frame in the HashMap to forward the packet to. To send UDP packets, the server does a register receive to be able to send packets over the network.
+
+\paragraph{UMP Message protocol}
+
+Since UDP is stateless, we need to transfer the remote IP and remote port with every send message over the UMP channel. This is done sending a header before the raw bytes over UMP.
+
+\begin{minted}{c}
+struct udp_ump_header {
+    ip_addr_t address;
+    uint16_t port;
+} __attribute__((__packed__));
+\end{minted}
+
+\paragraph{Slow clients}
+To make sure the network layer does not stall caused by too slow clients, we added a method to check if the UMP Frame can accommodate the next packet received in the UDP layer. This is necessary since the UMP channel send method is blocking. This means if the client is reading the data to slowly out of the UMP buffer, the packets will be dropped by the network layer if it can not fit them into the buffer on one go. Since this is UDP it is fine to drop UDP packets when the receiver can not keep up with the sending speed.
+
+\paragraph{UDP Socket Teardown}
+To close a UDP socket, the users sends a special message with address and port set to 0 inside the header. This signals that the port can be freed, and the UMP channel be deregistered.
+
+
+\subsection{TCP Client Socket}
+
+This is how the user code looks to connect to a tcp server with a connection timeout:
+\begin{minted}{c}
+struct tcp_socket tcp_socket;
+tcp_connect(&tcp_socket, local_port, remote_port, ip_addr, timeout);
+tcp_socket_send(&tcp_socket, "Hello world\n", 12);
+tcp_socket_close(&tcp_socket);
+\end{minted}
+Of course since the underlying is a UMP channel, we can register receives with TCP by calling \mintinline{c}{tcp_socket_register_recv(...)}
+
+
+\paragraph{TCP Socket Creation}
+
+The TCP socket creation works very similar from the user's process view. The only difference is that this time we have to specify source port, destination port, destination IP, and a timeout. The timeout is the maximum amount of time to wait for the ARP request (if the target MAC is unknown) and the TCP handshake to complete. In the server this is implemented by the using the function, \mintinline{c}{wait_for_or_timeout(timeout, fun, arg)} which is an extension of the deferred module, to wait on an event or timeout if it does not happen. So the server will initiate the handshake and will wait for it or timeout and then correspondingly return success or a timeout error.
+
+\paragraph{TCP Packet forwarding}
+The packet forwarding works the same way is it does in UDP with the only difference that the connection state which contains the UMP channel is passed to us by the TCP layer already, since it needs the state to verify and acknowledge any incoming packets.
+
+\paragraph{UMP Message protocol}
+
+Since TCP does have a UMP channel for every triplet (source port, destination port, destination IP) there is no need to send metadata over the channel with every packet. For TCP we only send raw bytes of the channel.\\
+In order to close a session (this can happen from either side), we send a message of size 0 over UMP (yes UMP supports this) to signal this, we can do this since TCP is a stream based protocol and the concept of empty messages does not exist.
+
+\paragraph{Slow clients}
+As previously discussed, we have the opportunity to identify slow client by being not able to fit more data into the UMP frame. This is a very helpful feature to use the traffic control of the remote TCP implementation to not send us more packets the user can process. In order to do this, a packet just does not get acknowledged if the UMP buffer is full, this can be seen as the TCP receive window.
+
+\paragraph{TCP Socket Teardown}
+When a close message was received in the netserver, it will initiate a finish message and set the state of the connection to closing. When the remote acknowledges the finished message, the port gets freed and the session state destroyed.
+
+\paragraph{Breaking up messages}
+
+Inside \mintinline{c}{tcp_socket_send()} messages that exceed a size of 1400 bytes get split up into smaller messages of size 1400 Bytes and less. This is such that the network layer does not have to handle splitting to long TCP packets.
+
+
+\subsection{TCP Server Socket}
+
+This is how the user code looks to implement a TCP server and accept incoming connections. Where \mintinline{c}{tcp_recv_handler(..)}  is a function that handles incoming TCP packets in this connection. The socket returned is a TCP client sockets which can be used as previously discussed.
+\begin{minted}{c}
+
+static void tcp_recv_handler(void *arg) {
+    struct tcp_socket *tcp_socket = (struct tcp_socket *)arg;
+    //...
+    tcp_socket_recv(tcp_socket, &buf_ptr, &buflen);
+    // ...
+    tcp_socket_send(tcp_socket, buf_ptr, buflen);
+}
+
+static void handle_tcp_client(struct tcp_socket *tcp_socket) {
+    tcp_socket_register_recv(tcp_socket, get_default_waitset(),
+                             MKCLOSURE(tcp_recv_handler, tcp_socket));
+}
+// ....
+struct tcp_server tcp_server;
+tcp_server_create(&tcp_server, 1235, &handle_tcp_client)
+\end{minted}
+
+\paragraph{Server Socket Creation}
+To create a TCP Server Socket we first create a nameservice called "tcp-server-port:" prepended with the port number which ensures that only one TCP server per port on the system can exist. (This abuses the fact that there is some multicore/ multiprocess safe logic within nameservers to make sure every name can only be used once). When we were able to create the nameservice (which means the port is free) we can send a request to the netsocket server containing the name of the name of this new nameservice and the port number. The net socket server then opens a connection to this nameservice and tells the TCP layer to accept connection requests on this port. 
+
+
+\paragraph{Accepting Clients}
+
+When ever the TCP layer receives a connection request on a server port, it answers to the handshake to initiate the connection. The TCP layer then informs the net socket server layer that there is a new connection on this port. In order to inform the user about this, the netsocket server sends a RPC over the previously established nameservice channel including the src port and the src IP, the user then has to respond with a UMP frame it wants this connection to communicate on. The User can then use this UMP frame to build a non server TCP socket which is exactly (and can be used as one) a previously described TCP client socket.
+This goes hand in hand with the standard Barrelfish approach, where the user provides the memory for the services it wants to use. 
+
+
+\section{TCP Terminal Service}
+
+In order to implement a very simple remote terminal service which can be used by running (on a remote) \mintinline{sh}{"nc 10.0.2.1 <port>"}. We start a TCP server in a user process, this can be done by running \mintinline{sh}{"remoteterminal <port>"} in the Toradex shell.
+Inside the handle new TCP client function, it establishes a connection to the terminal nameservice and does the \mintinline{c}{TERM_SWITCH_TO_UMP} RPC and sends the TCP client's socket UMP frame with it. The terminal service then replaces all write and read functions by reading and writing to the UMP channel. When the client closes the connection, the read and write functions are set back to the original ones. 
+
+\section{TCP and UDP as UMP channels}
+One final observation here is that everything from a UDP and TCP channel got abstracted away and is represented as a UMP channel (a socket is just a wrapper for a UMP channel), such that code can be written independently of the other process being locally on the same machine or remotely on another one (if you don't send capabilities).
+
+\section{High speed connections}
+\label{net:high_speed}
+
+While starting the benchmarks, we found out that sending packets from the user space is way slower than receiving (see next section). And we were able to root cause this to the fact that the netsocket server uses register receive to get messages on the UMP channels. This turns out to be really slow. 
+We added a new field to the RPC message to create a UDP or TCP socket that enables an optimization to speed up the sending, it is called High Speed Channels. It works by replacing the register receive with a thread that is actively waiting on the UMP channel. Since this is more resource intense (spawning more threads), this optimization can be opted in or out by setting the High Speed Channel flag in the RPC to true or false. This has also become part of the user interface when creating a UDP or TCP (server) socket.
+
+\section{Shell interface}
+
+The network layer provides some useful shell tools that can be used.
+
+\begin{minted}{sh}
+# Starts a UDP ord TCP echo server on a port:
+# Typing "bellyflop" is an Easter egg.
+echoserver <udp|tcp> <port> 
+
+
+# Start the TCP terminal service on a port:
+remoteterminal <port>
+
+# Starts a client nc chat session:
+run <coreid> nc <tcp-client|udp-client> <local_port> <remote_port> <ip>
+
+# Starts a server nc chat session:
+run <coreid> nc <tcp-server|udp-server> <local_port> 
+
+# Does an ARP request:
+arp_request <ip> <timeout>
+
+# Prints the current ARP table :
+arptable
+
+\end{minted}
+
+The run command allows the nc program if necessary to take over reading from the shell (which is not the default with oncore.)
+
+
+\section{Benchmarks}
+
+The remote machine which does the benchmarking is directly connected to the Toradex device over a LAN cable and can send up 90 Mbits with our python script (this is what we measured).
+
+\section{Ping Latency}
+\label{sec:ping}
+
+We were running \mintinline{sh}{ping  10.0.2.1} waiting for 250 Ping messages to happen and plotting the box plots of the latency. We were able to find out that depending if the terminal driver is running on the same core or not, the distribution of the latencies looks different. This is probably due to the fact that also the terminal driver is actively waiting, so will also happen if any other process is running on the same core using resources. Both have a median of 0.39ms and mean of 0.38ms
+and 11.24ms respectively. What happens here is that if the ENET driver is on the core, it takes about 0.39ms to answer a Ping if it is not it depends on when it is scheduled next. So this concluded that the latency goes up a lot the moment there is something else heavily running on the same core. The results can be seen in \ref{fig:net_ping}
+
+\begin{figure}[ht]
+    \centering
+    \scalebox{0.7}{\includesvg{./figs/net_bench_ping.svg} }
+    \caption{Boxplots for Ping RTT results with and without terminal service running in the background.}
+    \label{fig:net_ping}
+\end{figure}
+
+
+\subsection{UDP and TCP Throughput}
+
+We measured UDP and TCP throughput with a python application either sending or receiving data in a while loop till finished. We send 100 000 messages of size 1400 bytes (TCP might decide to split them into more messages), for the receive and send High Speed send connections, but only 100 messages for the normal send connections since they are really slow. For UDP we were sending packets at a rate of 90 Mbits to the Toradex device and counted how many made it there and were not dropped (the other way around there was no packet loss since my Linux machine can easily keep up with 30 Mbits). For TCP we were sending in a while loop, relying on the default TCP implementation on Ubuntu 20.04.4. To finish an experiment and end the time measurement, the remote side of the connection has to ACK the last packet by sending the string "END".
+\\
+\\
+We were able to achieve great throughput results for UDP and TCP, which can be seen in figure \ref{fig:net_th}. We can see here that High speed connection give an speed-up of up to 320x, this shows that actively waiting with a thread on something is way faster than waiting on something with a wait set.
+
+\begin{figure}[ht]
+    \centering
+         \subfloat[\centering ]{{\scalebox{0.4}{\includesvg{./figs/net_bench_udp_through.svg} }}}
+         \subfloat[\centering ]{{\scalebox{0.4}{\includesvg{./figs/net_bench_tcp_through.svg} }}}
+
+    \caption{Graphs showing throughput results for UDP and TCP in Mega bits per second. Sending and receiving from the Toradex device}
+    \label{fig:net_th}
+\end{figure}
+
+\section{UDP and TCP Latency}
+In order to measure the latency, we use the already implemented echo server and measure the Round Trip Time by waiting for the echo. The results can be seen in \ref{fig:net_lat}. To me, it is not entirely clear why the High speed channels have worse latency, and why the normal channels have such a distribution, centring at 7ms and 16ms, but the suspicion is that this depends on if the User module and/or the ENET module are currently scheduled or not (in these benchmarks the terminal service is running as well.). Also, to me, it is not entirely clear why the RTT is so high since the network RTT is around 0.4ms (see \ref{sec:ping}) and the RTT of UMP is also less than 0.4ms (see \ref{fig:ump_rtt}), combining the two, one might think the RTT should only be around 1ms not 10ms.
+The suspicion is that because other stuff is running on the same core, things get massively slowed down by context switches after forwarding the packet to UMP. 
+As we learned in other benchmarks already, the moment context switches are involved things get slow.
+
+
+After evaluating the results, one might think the High Speed Channels should actually be called High Bandwidth Channels.
+
+\begin{figure}[ht]
+    \centering
+    \scalebox{0.7}{\includesvg{./figs/net_bench_lat.svg} }
+
+    \caption{Violin plot showing the RTT results for UDP and TCP.}
+    \label{fig:net_lat}
+\end{figure}
+
+
+\subsection{Benchmark results Conclusion}
+We saw that we can achieve High throughput but also acceptable (not great though) latency. The user can now decide what it needs, for High Bandwidth applications it should use High Speed Channels but for low latency and low bandwidth requirement the normal channel should be used (e.g. for an ECHO server).
+
+
+\section{Limitations}
+
+\subsection{User Level ARP Requests}
+
+One clear limitation is that users when sending a UDP packet to a new destination first need to make an ARP Request RPC. The decision for this was made because many other options come with other disadvantages. For example, if we decide to buffer packets for an IP with an not replied ARP request: How many packets do we buffer? Do we buffer per user or per IP? If there is a cut of point, why provide buffering in the first place? When to delete the buffered IP packets if the MAC never becomes available? And the main concern here is if there is no buffer limit per user it is very easily even accidentally possible to let the ENET driver run out of memory by sending it packets for an unreachable destination.
+
+\subsection{No checksums are checked}
+
+Our code currently does not check IP, UDP, or TCP checksums on incoming packets.
+
+\subsection{Lengths are not checked}
+
+This might cause weird behaviour if someone sends packets with wrong and to long lengths to the device. This might cause the ENET module to over walk the RX memory, cause a pagefault and die.
+
+\subsection{No port service}
+
+There is currently no way to ask for a random free source UDP or TCP port, the user basically has to try out some ports.
+
+\subsection{TCP Simplifications}
+
+Obviously we did not implement a full TCP specification, so here is a list of the main simplifications we did. There are many more things that are not implemented from TCP like Options and Keep Alive messages (and much more...).
+
+\paragraph{No Retransmission for Handshakes}
+The current version does not support resending of packets that were part of the handshake if they were not acknowledged. 
+
+\paragraph{Reordering}
+Or TCP implementation does not try to reorder packets inside a receive buffer, it gets away with this by only sequentially acking data. This means if some reordering on the network happens, our TCP implementation will stop accepting packets till they get resend and arrive in order.
+
+\paragraph{No exponential back off}
+The retransmission has no exponential back off and will retry every 2 RTTs again. It will also not time out if the other side decides to silently close the connection without sending a FIN. 
+
+\paragraph{Remotes that do not agree to close a session}
+Currently, we delete a Session state when sending fin messages and just expect to counterparty to agree on closing the session. Fin messages are not retransmitted if they are not acknowledged since the session state was already deleted.
+
+\paragraph{Accepting clients is not Async}
+If a TCP server accepts a client, it does a blocking RPC to the user process and stalls the hole networks stack with this. During this time no packet can be received such that packets might get dropped.
+
+\paragraph{\mintinline{c}{handle_tcp_client()}}
+Since accepting clients is not Async and we send the UMP capability back after calling \mintinline{c}{handle_tcp_client()}, sending messages that don't fit inside the ring buffer inside \mintinline{c}{handle_tcp_client()} will deadlock (since it will wait for free space). So inside \mintinline{c}{handle_tcp_client()} as little works as possible should be done, and "long" welcome messages should be sent later or by spawning a new thread.
+
+\subsection{Clean-up after a process that died}
+
+Currently, there is no clean up happening if a process dies without closing its sessions. Which means that a port can not be reused later if a user process dies without cleaning up.
+
+
+
+
+
+
+
+
+
+
+
+
+

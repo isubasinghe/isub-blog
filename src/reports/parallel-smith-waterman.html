@@ -1,0 +1,843 @@
+<!-- Generated from reports/parallel-smith-waterman/report.tex. Do not edit directly. -->
+<article aria-labelledby="technical-report-title" class="ltx_document ltx_authors_1line ltx_leqno">
+<h1 id="technical-report-title" class="ltx_title ltx_title_document">Parallel Smith-Waterman with OpenMP</h1>
+<div class="ltx_authors">
+<span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Isitha Subasinghe
+</span><span class="ltx_author_notes">
+<span class="ltx_contact ltx_role_affiliation"><span class="ltx_text ltx_affiliation_institution">University of Melbourne</span><span class="ltx_text ltx_affiliation_city">Melbourne</span><span class="ltx_text ltx_affiliation_state">Victoria</span><span class="ltx_text ltx_affiliation_country">Australia</span>
+</span>
+<span class="ltx_contact ltx_role_email"><a href="mailto:isubasinghe@student.unimelb.edu.au">isubasinghe@student.unimelb.edu.au</a>
+</span></span></span>
+</div>
+
+<div class="ltx_abstract">
+<h6 class="ltx_title ltx_title_abstract">Abstract.</h6>
+<p class="ltx_p">Sequence alignment is the process of comparing and detecting similarities in biological sequences such as
+RNA and DNA. The idiomatic algorithm presented for this problem is inherently sequential. This report explores how the problem may be parallelised using the ”wavefront” technique along with OpenMP <span id="footnote1" class="ltx_note ltx_role_footnote"><button type="button" class="ltx_note_mark" aria-label="Show footnote 1">1</button><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_tag ltx_tag_note">1</span>See <a href="https://www.openmp.org" title="" class="ltx_ref ltx_url ltx_font_typewriter">https://www.openmp.org</a></span></span></span> . The algorithm implemented using OpenMP was able to offer a speedup of 13 over the sequential algorithm, interestingly, the effeciency of adding more cores to the problem was shown to decrease exponentially.</p>
+</div>
+<section id="S1" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">1. </span>Background</h2>
+
+<div id="S1.p1" class="ltx_para">
+<p class="ltx_p">The Smith-Waterman <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib1" class="ltx_ref">10</a>]</cite> algorithm introduced about 40 years ago, is the only known algorithm that is able to find the optimal local alignment of sequences, however, it is also one of the slowest algorithms for sequence alignment. With the exponential growth of biological databases, far outpacing microprocessor improvements, the use of parallelism to speed up the Smith-Waterman algorithm is of importance to bioinformatics. The algorithm itself is not trivially parallelisable, however, recognising the dependencies for the values in the dynamic programming matrix helps in observing that the algorithm is still however, parallelisable. The dependencies of the values in the dynamic programming matrix are shown in <a href="#S1.F1" title="In 1. Background ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">fig.</span> <span class="ltx_text ltx_ref_tag">1</span></a>.</p>
+</div>
+<figure id="S1.F1" class="ltx_figure"><svg id="S1.F1.pic1" class="ltx_picture ltx_centering" height="220.47" overflow="visible" version="1.1" width="341.29"><g transform="translate(0,220.47) matrix(1 0 0 -1 0 0) translate(13.16,0) translate(0,51.18)" fill="#000000" stroke="#000000" stroke-width="0.4pt"><clipPath id="pgfcp1"><path d="M -11.81 -51.18 M -11.81 -51.18 L -11.81 169.29 L 326.77 169.29 L 326.77 -51.18 Z M 326.77 169.29"></path></clipPath><g clip-path="url(#pgfcp1)"><g transform="matrix(1.0 0.0 0.0 1.0 -8.55 -2.8)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m1" class="ltx_Math" alttext="d_{0,4}" display="inline"><msub><mi>d</mi><mrow><mn>0</mn><mo>,</mo><mn>4</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 -8.55 36.57)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m2" class="ltx_Math" alttext="d_{0,3}" display="inline"><msub><mi>d</mi><mrow><mn>0</mn><mo>,</mo><mn>3</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 -8.55 75.94)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m3" class="ltx_Math" alttext="d_{0,2}" display="inline"><msub><mi>d</mi><mrow><mn>0</mn><mo>,</mo><mn>2</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 -8.55 115.31)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m4" class="ltx_Math" alttext="d_{0,1}" display="inline"><msub><mi>d</mi><mrow><mn>0</mn><mo>,</mo><mn>1</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 -8.55 154.68)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m5" class="ltx_Math" alttext="d_{0,0}" display="inline"><msub><mi>d</mi><mrow><mn>0</mn><mo>,</mo><mn>0</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 30.82 -2.8)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m6" class="ltx_Math" alttext="d_{1,4}" display="inline"><msub><mi>d</mi><mrow><mn>1</mn><mo>,</mo><mn>4</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 30.82 36.57)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m7" class="ltx_Math" alttext="d_{1,3}" display="inline"><msub><mi>d</mi><mrow><mn>1</mn><mo>,</mo><mn>3</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 30.82 75.94)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m8" class="ltx_Math" alttext="d_{1,2}" display="inline"><msub><mi>d</mi><mrow><mn>1</mn><mo>,</mo><mn>2</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 30.82 115.31)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m9" class="ltx_Math" alttext="d_{1,1}" display="inline"><msub><mi>d</mi><mrow><mn>1</mn><mo>,</mo><mn>1</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 30.82 154.68)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m10" class="ltx_Math" alttext="d_{1,0}" display="inline"><msub><mi>d</mi><mrow><mn>1</mn><mo>,</mo><mn>0</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 70.19 -2.8)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m11" class="ltx_Math" alttext="d_{2,4}" display="inline"><msub><mi>d</mi><mrow><mn>2</mn><mo>,</mo><mn>4</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 70.19 36.57)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m12" class="ltx_Math" alttext="d_{2,3}" display="inline"><msub><mi>d</mi><mrow><mn>2</mn><mo>,</mo><mn>3</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 70.19 75.94)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m13" class="ltx_Math" alttext="d_{2,2}" display="inline"><msub><mi>d</mi><mrow><mn>2</mn><mo>,</mo><mn>2</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 70.19 115.31)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m14" class="ltx_Math" alttext="d_{2,1}" display="inline"><msub><mi>d</mi><mrow><mn>2</mn><mo>,</mo><mn>1</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 70.19 154.68)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m15" class="ltx_Math" alttext="d_{2,0}" display="inline"><msub><mi>d</mi><mrow><mn>2</mn><mo>,</mo><mn>0</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 109.56 -2.8)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m16" class="ltx_Math" alttext="d_{3,4}" display="inline"><msub><mi>d</mi><mrow><mn>3</mn><mo>,</mo><mn>4</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 109.56 36.57)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m17" class="ltx_Math" alttext="d_{3,3}" display="inline"><msub><mi>d</mi><mrow><mn>3</mn><mo>,</mo><mn>3</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 109.56 75.94)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m18" class="ltx_Math" alttext="d_{3,2}" display="inline"><msub><mi>d</mi><mrow><mn>3</mn><mo>,</mo><mn>2</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 109.56 115.31)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m19" class="ltx_Math" alttext="d_{3,1}" display="inline"><msub><mi>d</mi><mrow><mn>3</mn><mo>,</mo><mn>1</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 109.56 154.68)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m20" class="ltx_Math" alttext="d_{3,0}" display="inline"><msub><mi>d</mi><mrow><mn>3</mn><mo>,</mo><mn>0</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 148.93 -2.8)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m21" class="ltx_Math" alttext="d_{4,4}" display="inline"><msub><mi>d</mi><mrow><mn>4</mn><mo>,</mo><mn>4</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 148.93 36.57)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m22" class="ltx_Math" alttext="d_{4,3}" display="inline"><msub><mi>d</mi><mrow><mn>4</mn><mo>,</mo><mn>3</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 148.93 75.94)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m23" class="ltx_Math" alttext="d_{4,2}" display="inline"><msub><mi>d</mi><mrow><mn>4</mn><mo>,</mo><mn>2</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 148.93 115.31)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m24" class="ltx_Math" alttext="d_{4,1}" display="inline"><msub><mi>d</mi><mrow><mn>4</mn><mo>,</mo><mn>1</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 148.93 154.68)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m25" class="ltx_Math" alttext="d_{4,0}" display="inline"><msub><mi>d</mi><mrow><mn>4</mn><mo>,</mo><mn>0</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 188.3 -2.8)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m26" class="ltx_Math" alttext="d_{5,4}" display="inline"><msub><mi>d</mi><mrow><mn>5</mn><mo>,</mo><mn>4</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 188.3 36.57)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m27" class="ltx_Math" alttext="d_{5,3}" display="inline"><msub><mi>d</mi><mrow><mn>5</mn><mo>,</mo><mn>3</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 188.3 75.94)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m28" class="ltx_Math" alttext="d_{5,2}" display="inline"><msub><mi>d</mi><mrow><mn>5</mn><mo>,</mo><mn>2</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 188.3 115.31)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m29" class="ltx_Math" alttext="d_{5,1}" display="inline"><msub><mi>d</mi><mrow><mn>5</mn><mo>,</mo><mn>1</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 188.3 154.68)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m30" class="ltx_Math" alttext="d_{5,0}" display="inline"><msub><mi>d</mi><mrow><mn>5</mn><mo>,</mo><mn>0</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 227.67 -2.8)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m31" class="ltx_Math" alttext="d_{6,4}" display="inline"><msub><mi>d</mi><mrow><mn>6</mn><mo>,</mo><mn>4</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 227.67 36.57)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m32" class="ltx_Math" alttext="d_{6,3}" display="inline"><msub><mi>d</mi><mrow><mn>6</mn><mo>,</mo><mn>3</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 227.67 75.94)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m33" class="ltx_Math" alttext="d_{6,2}" display="inline"><msub><mi>d</mi><mrow><mn>6</mn><mo>,</mo><mn>2</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 227.67 115.31)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m34" class="ltx_Math" alttext="d_{6,1}" display="inline"><msub><mi>d</mi><mrow><mn>6</mn><mo>,</mo><mn>1</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 227.67 154.68)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m35" class="ltx_Math" alttext="d_{6,0}" display="inline"><msub><mi>d</mi><mrow><mn>6</mn><mo>,</mo><mn>0</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 267.04 -2.8)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m36" class="ltx_Math" alttext="d_{7,4}" display="inline"><msub><mi>d</mi><mrow><mn>7</mn><mo>,</mo><mn>4</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 267.04 36.57)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m37" class="ltx_Math" alttext="d_{7,3}" display="inline"><msub><mi>d</mi><mrow><mn>7</mn><mo>,</mo><mn>3</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 267.04 75.94)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m38" class="ltx_Math" alttext="d_{7,2}" display="inline"><msub><mi>d</mi><mrow><mn>7</mn><mo>,</mo><mn>2</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 267.04 115.31)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m39" class="ltx_Math" alttext="d_{7,1}" display="inline"><msub><mi>d</mi><mrow><mn>7</mn><mo>,</mo><mn>1</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 267.04 154.68)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m40" class="ltx_Math" alttext="d_{7,0}" display="inline"><msub><mi>d</mi><mrow><mn>7</mn><mo>,</mo><mn>0</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 306.41 -2.8)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m41" class="ltx_Math" alttext="d_{8,4}" display="inline"><msub><mi>d</mi><mrow><mn>8</mn><mo>,</mo><mn>4</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 306.41 36.57)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m42" class="ltx_Math" alttext="d_{8,3}" display="inline"><msub><mi>d</mi><mrow><mn>8</mn><mo>,</mo><mn>3</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 306.41 75.94)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m43" class="ltx_Math" alttext="d_{8,2}" display="inline"><msub><mi>d</mi><mrow><mn>8</mn><mo>,</mo><mn>2</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 306.41 115.31)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m44" class="ltx_Math" alttext="d_{8,1}" display="inline"><msub><mi>d</mi><mrow><mn>8</mn><mo>,</mo><mn>1</mn></mrow></msub></math></foreignObject></g><g></g><g transform="matrix(1.0 0.0 0.0 1.0 306.41 154.68)" fill="#000000" stroke="#000000"><foreignObject width="17.1" height="13.61" transform="matrix(1 0 0 -1 0 16.6)" overflow="visible"><math id="S1.F1.pic1.m45" class="ltx_Math" alttext="d_{8,0}" display="inline"><msub><mi>d</mi><mrow><mn>8</mn><mo>,</mo><mn>0</mn></mrow></msub></math></foreignObject></g><g></g><path d="M 39.37 12.33 L 39.37 27.67" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 39.37 12.33)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 39.37 51.7 L 39.37 67.04" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 39.37 51.7)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 39.37 91.07 L 39.37 106.41" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 39.37 91.07)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 39.37 130.44 L 39.37 145.78" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 39.37 130.44)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 78.74 12.33 L 78.74 27.67" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 78.74 12.33)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 78.74 51.7 L 78.74 67.04" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 78.74 51.7)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 78.74 91.07 L 78.74 106.41" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 78.74 91.07)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 78.74 130.44 L 78.74 145.78" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 78.74 130.44)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 118.11 12.33 L 118.11 27.67" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 118.11 12.33)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 118.11 51.7 L 118.11 67.04" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 118.11 51.7)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 118.11 91.07 L 118.11 106.41" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 118.11 91.07)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 118.11 130.44 L 118.11 145.78" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 118.11 130.44)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 157.48 12.33 L 157.48 27.67" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 157.48 12.33)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 157.48 51.7 L 157.48 67.04" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 157.48 51.7)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 157.48 91.07 L 157.48 106.41" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 157.48 91.07)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 157.48 130.44 L 157.48 145.78" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 157.48 130.44)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 196.85 12.33 L 196.85 27.67" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 196.85 12.33)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 196.85 51.7 L 196.85 67.04" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 196.85 51.7)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 196.85 91.07 L 196.85 106.41" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 196.85 91.07)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 196.85 130.44 L 196.85 145.78" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 196.85 130.44)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 236.22 12.33 L 236.22 27.67" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 236.22 12.33)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 236.22 51.7 L 236.22 67.04" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 236.22 51.7)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 236.22 91.07 L 236.22 106.41" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 236.22 91.07)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 236.22 130.44 L 236.22 145.78" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 236.22 130.44)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 275.59 12.33 L 275.59 27.67" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 275.59 12.33)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 275.59 51.7 L 275.59 67.04" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 275.59 51.7)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 275.59 91.07 L 275.59 106.41" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 275.59 91.07)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 275.59 130.44 L 275.59 145.78" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 275.59 130.44)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 314.96 12.33 L 314.96 27.67" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 314.96 12.33)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 314.96 51.7 L 314.96 67.04" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 314.96 51.7)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 314.96 91.07 L 314.96 106.41" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 314.96 91.07)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 314.96 130.44 L 314.96 145.78" style="fill:none"></path><g transform="matrix(0.0 -1.0 1.0 0.0 314.96 130.44)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 13.44 0 L 27.04 0" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 27.04 0)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 13.44 39.37 L 27.04 39.37" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 27.04 39.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 13.44 78.74 L 27.04 78.74" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 27.04 78.74)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 13.44 118.11 L 27.04 118.11" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 27.04 118.11)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 52.81 0 L 66.41 0" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 66.41 0)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 52.81 39.37 L 66.41 39.37" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 66.41 39.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 52.81 78.74 L 66.41 78.74" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 66.41 78.74)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 52.81 118.11 L 66.41 118.11" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 66.41 118.11)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 92.18 0 L 105.78 0" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 105.78 0)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 92.18 39.37 L 105.78 39.37" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 105.78 39.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 92.18 78.74 L 105.78 78.74" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 105.78 78.74)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 92.18 118.11 L 105.78 118.11" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 105.78 118.11)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 131.55 0 L 145.15 0" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 145.15 0)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 131.55 39.37 L 145.15 39.37" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 145.15 39.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 131.55 78.74 L 145.15 78.74" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 145.15 78.74)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 131.55 118.11 L 145.15 118.11" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 145.15 118.11)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 170.92 0 L 184.52 0" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 184.52 0)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 170.92 39.37 L 184.52 39.37" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 184.52 39.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 170.92 78.74 L 184.52 78.74" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 184.52 78.74)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 170.92 118.11 L 184.52 118.11" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 184.52 118.11)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 210.29 0 L 223.89 0" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 223.89 0)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 210.29 39.37 L 223.89 39.37" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 223.89 39.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 210.29 78.74 L 223.89 78.74" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 223.89 78.74)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 210.29 118.11 L 223.89 118.11" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 223.89 118.11)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 249.66 0 L 263.26 0" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 263.26 0)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 249.66 39.37 L 263.26 39.37" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 263.26 39.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 249.66 78.74 L 263.26 78.74" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 263.26 78.74)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 249.66 118.11 L 263.26 118.11" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 263.26 118.11)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 289.03 0 L 302.63 0" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 302.63 0)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 289.03 39.37 L 302.63 39.37" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 302.63 39.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 289.03 78.74 L 302.63 78.74" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 302.63 78.74)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 289.03 118.11 L 302.63 118.11" style="fill:none"></path><g transform="matrix(1.0 0.0 0.0 1.0 302.63 118.11)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 27.11 12.26 L 15.75 23.62" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 27.11 12.26)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 27.11 51.63 L 15.75 62.99" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 27.11 51.63)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 27.11 91 L 15.75 102.36" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 27.11 91)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 27.11 130.37 L 15.75 141.73" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 27.11 130.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 66.48 12.26 L 55.12 23.62" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 66.48 12.26)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 66.48 51.63 L 55.12 62.99" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 66.48 51.63)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 66.48 91 L 55.12 102.36" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 66.48 91)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 66.48 130.37 L 55.12 141.73" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 66.48 130.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 105.85 12.26 L 94.49 23.62" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 105.85 12.26)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 105.85 51.63 L 94.49 62.99" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 105.85 51.63)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 105.85 91 L 94.49 102.36" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 105.85 91)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 105.85 130.37 L 94.49 141.73" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 105.85 130.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 145.22 12.26 L 133.86 23.62" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 145.22 12.26)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 145.22 51.63 L 133.86 62.99" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 145.22 51.63)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 145.22 91 L 133.86 102.36" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 145.22 91)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 145.22 130.37 L 133.86 141.73" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 145.22 130.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 184.59 12.26 L 173.23 23.62" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 184.59 12.26)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 184.59 51.63 L 173.23 62.99" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 184.59 51.63)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 184.59 91 L 173.23 102.36" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 184.59 91)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 184.59 130.37 L 173.23 141.73" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 184.59 130.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 223.96 12.26 L 212.6 23.62" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 223.96 12.26)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 223.96 51.63 L 212.6 62.99" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 223.96 51.63)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 223.96 91 L 212.6 102.36" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 223.96 91)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 223.96 130.37 L 212.6 141.73" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 223.96 130.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 263.33 12.26 L 251.97 23.62" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 263.33 12.26)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 263.33 51.63 L 251.97 62.99" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 263.33 51.63)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 263.33 91 L 251.97 102.36" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 263.33 91)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 263.33 130.37 L 251.97 141.73" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 263.33 130.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 302.7 12.26 L 291.34 23.62" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 302.7 12.26)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 302.7 51.63 L 291.34 62.99" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 302.7 51.63)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 302.7 91 L 291.34 102.36" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 302.7 91)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g><path d="M 302.7 130.37 L 291.34 141.73" style="fill:none"></path><g transform="matrix(0.7071 -0.7071 0.7071 0.7071 302.7 130.37)" stroke-dasharray="none" stroke-dashoffset="0.0pt" stroke-linecap="round" stroke-linejoin="round" stroke-width="0.32pt"><path d="M -1.66 2.21 C -1.52 1.38 0 0.14 0.42 0 C 0 -0.14 -1.52 -1.38 -1.66 -2.21" style="fill:none"></path></g><g></g></g></g></svg>
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Figure 1. </span>Dependencies for values in Smith-Waterman matrix</figcaption>
+</figure>
+</section>
+<section id="S2" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2. </span>Related Work</h2>
+
+<div id="S2.p1" class="ltx_para">
+<p class="ltx_p">Searching of DNA and RNA sequences is a fundamental task in bioinformatics and as mentioned previously Smith-Waterman offers optimal local alignment. However, as a result of optimal local alignment being computationally expensive, the most common solutions do not aim to provide this, instead they use heuristics to reduce the computational cost, examples of such tools are FASTA <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib6" class="ltx_ref">8</a>]</cite> and BLAST <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib7" class="ltx_ref">1</a>]</cite>.</p>
+</div>
+<div id="S2.p2" class="ltx_para">
+<p class="ltx_p">Early work in parallelising Smith-Waterman was based upon diagonal parallelisation, this was initially done through SIMD instructions.SIMD implementations have proven to be popular as a result of their common availability in x86 systems and have demonstrated significant speedups in several published literature <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib13" class="ltx_ref">9</a>, <a href="#bib.bib12" class="ltx_ref">12</a>]</cite>.</p>
+</div>
+<div id="S2.p3" class="ltx_para">
+<p class="ltx_p">With the rapid accessibility of GPUs over the years following the early work on SIMD parallelism, CUDA compatible GPUs were found to be effective as hardware accelerators for the local optimal alignment problem. The CUDA implementation shown in <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib11" class="ltx_ref">5</a>]</cite> was demonstrated to be 2 to 30 times faster than other implementations on commodity hardware at the time.</p>
+</div>
+<div id="S2.p4" class="ltx_para">
+<p class="ltx_p">Field Programmable Gate Arrays are integrated circuits that can be programmed through the user, using some hardware description language such as VHDL or Verilog. These implementations are naturally faster than their counterparts in higher level languages as the circuit itself is programmed for the specific problem, however, they are difficult to program and debug. Storaasli <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib8" class="ltx_ref">11</a>]</cite> claims that their implementation of Smith-Waterman on two Cray XD1 systems was able to obtain a 100x speedup. Interestingly, speedups of 160x have been made through the use of FPGAs as shown in <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib10" class="ltx_ref">4</a>]</cite>.</p>
+</div>
+</section>
+<section id="S3" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">3. </span>Proposed Approach</h2>
+
+<section id="S3.SS1" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.1. </span>Sequential Algorithm</h3>
+
+<div id="S3.SS1.p1" class="ltx_para">
+<p class="ltx_p">The sequential algorithm used was near identical to the provided program, however certain optimisations were performed to the program, along with bug fixes. The code for this algorithm is shown below:</p>
+</div>
+<figure id="alg1" class="ltx_float ltx_float_algorithm ltx_framed ltx_framed_top">
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_float"><span class="ltx_text ltx_font_bold">Algorithm 1</span> </span> Sequential Smith-Waterman</figcaption>
+<div class="ltx_listing ltx_listing">
+<div id="alg1.l1" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">1:</span></span><span class="ltx_text ltx_font_bold">procedure</span> <span class="ltx_text ltx_font_smallcaps">SeqSmithWaterman</span>
+
+</div>
+<div id="alg1.l2" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">2:</span></span>     <math id="alg1.l2.m1" class="ltx_Math" alttext="\text{m,n}\leftarrow\text{dimensions of }\textit{matrix}" display="inline"><mrow><mtext>m,n</mtext><mo stretchy="false">←</mo><mrow><mtext>dimensions of </mtext><mtext class="ltx_mathvariant_italic">matrix</mtext></mrow></mrow></math>
+
+</div>
+<div id="alg1.l3" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">3:</span></span>     <math id="alg1.l3.m1" class="ltx_Math" alttext="pgap\leftarrow\textit{gap penalty}" display="inline"><mrow><mrow><mi>p</mi><mo>⁢</mo><mi>g</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>p</mi></mrow><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">gap penalty</mtext></mrow></math>
+
+</div>
+<div id="alg1.l4" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">4:</span></span>     <math id="alg1.l4.m1" class="ltx_Math" alttext="pxy\leftarrow\textit{mismatch penalty}" display="inline"><mrow><mrow><mi>p</mi><mo>⁢</mo><mi>x</mi><mo>⁢</mo><mi>y</mi></mrow><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">mismatch penalty</mtext></mrow></math>
+
+</div>
+<div id="alg1.l5" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">5:</span></span>     <math id="alg1.l5.m1" class="ltx_Math" alttext="\text{dp[m][n]}\leftarrow\text{newMatrix(m+1,n+1)}" display="inline"><mrow><mtext>dp[m][n]</mtext><mo stretchy="false">←</mo><mtext>newMatrix(m+1,n+1)</mtext></mrow></math>
+
+</div>
+<div id="alg1.l6" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">6:</span></span>     <math id="alg1.l6.m1" class="ltx_Math" alttext="\text{x}\leftarrow\textit{sequence x}" display="inline"><mrow><mtext>x</mtext><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">sequence x</mtext></mrow></math>
+
+</div>
+<div id="alg1.l7" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">7:</span></span>     <math id="alg1.l7.m1" class="ltx_Math" alttext="\text{y}\leftarrow\textit{sequence y}" display="inline"><mrow><mtext>y</mtext><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">sequence y</mtext></mrow></math>
+
+</div>
+<div id="alg1.l8" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">8:</span></span>     <span class="ltx_text ltx_font_bold">for</span> <math id="alg1.l8.m1" class="ltx_Math" alttext="\text{i}\leftarrow[0\ldots m]" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mo stretchy="false">[</mo><mrow><mn>0</mn><mo>⁢</mo><mi mathvariant="normal">…</mi><mo>⁢</mo><mi>m</mi></mrow><mo stretchy="false">]</mo></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg1.l9" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">9:</span></span>         <math id="alg1.l9.m1" class="ltx_Math" alttext="\text{dp[i][0]}\leftarrow\text{i}*\text{pgap}" display="inline"><mrow><mtext>dp[i][0]</mtext><mo stretchy="false">←</mo><mrow><mtext>i</mtext><mo lspace="0.222em" rspace="0.222em">∗</mo><mtext>pgap</mtext></mrow></mrow></math>
+     
+</div>
+<div id="alg1.l10" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">10:</span></span>     <span class="ltx_text ltx_font_bold">for</span> <math id="alg1.l10.m1" class="ltx_Math" alttext="\text{i}\leftarrow[0\ldots n]" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mo stretchy="false">[</mo><mrow><mn>0</mn><mo>⁢</mo><mi mathvariant="normal">…</mi><mo>⁢</mo><mi>n</mi></mrow><mo stretchy="false">]</mo></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg1.l11" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">11:</span></span>         <math id="alg1.l11.m1" class="ltx_Math" alttext="\text{dp[0][i]}\leftarrow\text{i}*\text{pgap}" display="inline"><mrow><mtext>dp[0][i]</mtext><mo stretchy="false">←</mo><mrow><mtext>i</mtext><mo lspace="0.222em" rspace="0.222em">∗</mo><mtext>pgap</mtext></mrow></mrow></math>
+     
+</div>
+<div id="alg1.l12" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">12:</span></span>     <span class="ltx_text ltx_font_bold">for</span> <math id="alg1.l12.m1" class="ltx_Math" alttext="\text{i}\leftarrow[1\ldots m]" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mo stretchy="false">[</mo><mrow><mn>1</mn><mo>⁢</mo><mi mathvariant="normal">…</mi><mo>⁢</mo><mi>m</mi></mrow><mo stretchy="false">]</mo></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg1.l13" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">13:</span></span>         <span class="ltx_text ltx_font_bold">for</span> <math id="alg1.l13.m1" class="ltx_Math" alttext="\text{j}\leftarrow[1\ldots n]" display="inline"><mrow><mtext>j</mtext><mo stretchy="false">←</mo><mrow><mo stretchy="false">[</mo><mrow><mn>1</mn><mo>⁢</mo><mi mathvariant="normal">…</mi><mo>⁢</mo><mi>n</mi></mrow><mo stretchy="false">]</mo></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg1.l14" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">14:</span></span>              <span class="ltx_text ltx_font_bold">if</span> <math id="alg1.l14.m1" class="ltx_Math" alttext="\text{x[i-1]}=\text{y[j-1]}" display="inline"><mrow><mtext>x[i-1]</mtext><mo>=</mo><mtext>y[j-1]</mtext></mrow></math> <span class="ltx_text ltx_font_bold">then</span>
+
+</div>
+<div id="alg1.l15" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">15:</span></span>                  <math id="alg1.l15.m1" class="ltx_Math" alttext="\text{dp[i][j]}=\text{dp[i-1][j-1]}" display="inline"><mrow><mtext>dp[i][j]</mtext><mo>=</mo><mtext>dp[i-1][j-1]</mtext></mrow></math>
+
+</div>
+<div id="alg1.l16" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">16:</span></span>              <span class="ltx_text ltx_font_bold">else</span>
+</div>
+<div id="alg1.l17" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">17:</span></span>                  <math id="alg1.l17.m1" class="ltx_Math" alttext="\text{dp[i][j]}=\text{min(dp[j-1][i-1] + pxy, dp[j-1][i] + pgap, dp[j][i-1] + %
+pgap)}" display="inline"><mrow><mtext>dp[i][j]</mtext><mo>=</mo><mtext>min(dp[j-1][i-1] + pxy, dp[j-1][i] + pgap, dp[j][i-1] + pgap)</mtext></mrow></math>
+                            <span class="ltx_text ltx_font_bold">return </span> traceback(dp)
+
+</div>
+</div>
+</figure>
+</section>
+<section id="S3.SS2" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.2. </span>Parallel Algorithm</h3>
+
+<div id="S3.SS2.p1" class="ltx_para">
+<p class="ltx_p">The psuedocode for the parallel algorithm is defined as follows:</p>
+</div>
+<figure id="alg2" class="ltx_float ltx_float_algorithm ltx_framed ltx_framed_top">
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_float"><span class="ltx_text ltx_font_bold">Algorithm 2</span> </span> Parallel Smith-Waterman</figcaption>
+<div class="ltx_listing ltx_listing">
+<div id="alg2.l1" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">1:</span></span><span class="ltx_text ltx_font_bold">procedure</span> <span class="ltx_text ltx_font_smallcaps">ParSmithWaterman</span>
+
+</div>
+<div id="alg2.l2" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">2:</span></span>     <math id="alg2.l2.m1" class="ltx_Math" alttext="\text{m,n}\leftarrow\text{dimensions of }\textit{matrix}" display="inline"><mrow><mtext>m,n</mtext><mo stretchy="false">←</mo><mrow><mtext>dimensions of </mtext><mtext class="ltx_mathvariant_italic">matrix</mtext></mrow></mrow></math>
+
+</div>
+<div id="alg2.l3" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">3:</span></span>     <math id="alg2.l3.m1" class="ltx_Math" alttext="pgap\leftarrow\textit{gap penalty}" display="inline"><mrow><mrow><mi>p</mi><mo>⁢</mo><mi>g</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>p</mi></mrow><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">gap penalty</mtext></mrow></math>
+
+</div>
+<div id="alg2.l4" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">4:</span></span>     <math id="alg2.l4.m1" class="ltx_Math" alttext="pxy\leftarrow\textit{mismatch penalty}" display="inline"><mrow><mrow><mi>p</mi><mo>⁢</mo><mi>x</mi><mo>⁢</mo><mi>y</mi></mrow><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">mismatch penalty</mtext></mrow></math>
+
+</div>
+<div id="alg2.l5" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">5:</span></span>     <math id="alg2.l5.m1" class="ltx_Math" alttext="\delta_{i}\leftarrow\textit{tile width}" display="inline"><mrow><msub><mi>δ</mi><mi>i</mi></msub><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">tile width</mtext></mrow></math>
+
+</div>
+<div id="alg2.l6" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">6:</span></span>     <math id="alg2.l6.m1" class="ltx_Math" alttext="\delta_{j}\leftarrow\textit{tile height}" display="inline"><mrow><msub><mi>δ</mi><mi>j</mi></msub><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">tile height</mtext></mrow></math>
+
+</div>
+<div id="alg2.l7" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">7:</span></span>     <math id="alg2.l7.m1" class="ltx_Math" alttext="outer_{i}\leftarrow 0" display="inline"><mrow><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>i</mi></msub></mrow><mo stretchy="false">←</mo><mn>0</mn></mrow></math>
+
+</div>
+<div id="alg2.l8" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">8:</span></span>     <math id="alg2.l8.m1" class="ltx_Math" alttext="outer_{j}\leftarrow 0" display="inline"><mrow><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>j</mi></msub></mrow><mo stretchy="false">←</mo><mn>0</mn></mrow></math>
+
+</div>
+<div id="alg2.l9" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">9:</span></span>     <math id="alg2.l9.m1" class="ltx_Math" alttext="diagonals\leftarrow\left\lfloor\frac{m}{\delta_{i}}\right\rfloor+\left\lfloor%
+\frac{n}{\delta_{j}}\right\rfloor+\begin{cases}1&amp;m\%\delta_{i}+n\%\delta_{j}&gt;0%
+\\
+0&amp;m\%\delta_{i}+n\%\delta_{j}=0\\
+\end{cases}" display="inline"><mrow><mrow><mi>d</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>g</mi><mo>⁢</mo><mi>o</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>l</mi><mo>⁢</mo><mi>s</mi></mrow><mo stretchy="false">←</mo><mrow><mrow><mo>⌊</mo><mfrac><mi>m</mi><msub><mi>δ</mi><mi>i</mi></msub></mfrac><mo>⌋</mo></mrow><mo>+</mo><mrow><mo>⌊</mo><mfrac><mi>n</mi><msub><mi>δ</mi><mi>j</mi></msub></mfrac><mo>⌋</mo></mrow><mo>+</mo><mrow><mo>{</mo><mtable columnspacing="5pt" rowspacing="0pt"><mtr><mtd class="ltx_align_left" columnalign="left"><mn>1</mn></mtd><mtd class="ltx_align_left" columnalign="left"><mrow><mrow><mrow><mrow><mi>m</mi><mo>%</mo></mrow><mo>⁢</mo><msub><mi>δ</mi><mi>i</mi></msub></mrow><mo>+</mo><mrow><mrow><mi>n</mi><mo>%</mo></mrow><mo>⁢</mo><msub><mi>δ</mi><mi>j</mi></msub></mrow></mrow><mo>&gt;</mo><mn>0</mn></mrow></mtd></mtr><mtr><mtd class="ltx_align_left" columnalign="left"><mn>0</mn></mtd><mtd class="ltx_align_left" columnalign="left"><mrow><mrow><mrow><mrow><mi>m</mi><mo>%</mo></mrow><mo>⁢</mo><msub><mi>δ</mi><mi>i</mi></msub></mrow><mo>+</mo><mrow><mrow><mi>n</mi><mo>%</mo></mrow><mo>⁢</mo><msub><mi>δ</mi><mi>j</mi></msub></mrow></mrow><mo>=</mo><mn>0</mn></mrow></mtd></mtr></mtable></mrow></mrow></mrow></math>
+
+</div>
+<div id="alg2.l10" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">10:</span></span>     <math id="alg2.l10.m1" class="ltx_Math" alttext="\text{dp[m][n]}\leftarrow\text{NewMatrix(m+1,n+1)}" display="inline"><mrow><mtext>dp[m][n]</mtext><mo stretchy="false">←</mo><mtext>NewMatrix(m+1,n+1)</mtext></mrow></math>
+
+</div>
+<div id="alg2.l11" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">11:</span></span>     <math id="alg2.l11.m1" class="ltx_Math" alttext="\text{x}\leftarrow\textit{sequence x}" display="inline"><mrow><mtext>x</mtext><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">sequence x</mtext></mrow></math>
+
+</div>
+<div id="alg2.l12" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">12:</span></span>     <math id="alg2.l12.m1" class="ltx_Math" alttext="\text{y}\leftarrow\textit{sequence y}" display="inline"><mrow><mtext>y</mtext><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">sequence y</mtext></mrow></math>
+
+</div>
+<div id="alg2.l13" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">13:</span></span>     <span class="ltx_text ltx_font_bold">for</span> <math id="alg2.l13.m1" class="ltx_Math" alttext="\text{i}\leftarrow[0\ldots m]\textbf{ parallel}" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mrow><mo stretchy="false">[</mo><mrow><mn>0</mn><mo>⁢</mo><mi mathvariant="normal">…</mi><mo>⁢</mo><mi>m</mi></mrow><mo stretchy="false">]</mo></mrow><mo>⁢</mo><mtext class="ltx_mathvariant_bold"> parallel</mtext></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg2.l14" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">14:</span></span>         <math id="alg2.l14.m1" class="ltx_Math" alttext="\text{dp[i][0]}\leftarrow\text{i}*\text{pgap}" display="inline"><mrow><mtext>dp[i][0]</mtext><mo stretchy="false">←</mo><mrow><mtext>i</mtext><mo lspace="0.222em" rspace="0.222em">∗</mo><mtext>pgap</mtext></mrow></mrow></math>
+     
+</div>
+<div id="alg2.l15" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">15:</span></span>     <span class="ltx_text ltx_font_bold">for</span> <math id="alg2.l15.m1" class="ltx_Math" alttext="\text{i}\leftarrow[0\ldots n]\textbf{ parallel}" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mrow><mo stretchy="false">[</mo><mrow><mn>0</mn><mo>⁢</mo><mi mathvariant="normal">…</mi><mo>⁢</mo><mi>n</mi></mrow><mo stretchy="false">]</mo></mrow><mo>⁢</mo><mtext class="ltx_mathvariant_bold"> parallel</mtext></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg2.l16" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">16:</span></span>         <math id="alg2.l16.m1" class="ltx_Math" alttext="\text{dp[0][i]}\leftarrow\text{i}*\text{pgap}" display="inline"><mrow><mtext>dp[0][i]</mtext><mo stretchy="false">←</mo><mrow><mtext>i</mtext><mo lspace="0.222em" rspace="0.222em">∗</mo><mtext>pgap</mtext></mrow></mrow></math>
+     
+</div>
+<div id="alg2.l17" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">17:</span></span>     <span class="ltx_text ltx_font_bold">for</span> <math id="alg2.l17.m1" class="ltx_Math" alttext="\text{i}\leftarrow\{0,\ldots,\text{diagonals}-1\}" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mo stretchy="false">{</mo><mn>0</mn><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><mrow><mtext>diagonals</mtext><mo>−</mo><mn>1</mn></mrow><mo stretchy="false">}</mo></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg2.l18" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">18:</span></span>         <math id="alg2.l18.m1" class="ltx_Math" alttext="diff_{i}\leftarrow outer_{i}" display="inline"><mrow><mrow><mi>d</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>f</mi><mo>⁢</mo><msub><mi>f</mi><mi>i</mi></msub></mrow><mo stretchy="false">←</mo><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>i</mi></msub></mrow></mrow></math>
+
+</div>
+<div id="alg2.l19" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">19:</span></span>         <math id="alg2.l19.m1" class="ltx_Math" alttext="diff_{j}\leftarrow n-outer_{j}-1" display="inline"><mrow><mrow><mi>d</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>f</mi><mo>⁢</mo><msub><mi>f</mi><mi>j</mi></msub></mrow><mo stretchy="false">←</mo><mrow><mi>n</mi><mo>−</mo><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>j</mi></msub></mrow><mo>−</mo><mn>1</mn></mrow></mrow></math>
+
+</div>
+<div id="alg2.l20" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">20:</span></span>         <math id="alg2.l20.m1" class="ltx_Math" alttext="diag_{i}\leftarrow 1+\left\lfloor\frac{diff_{i}}{\delta_{i}}\right\rfloor" display="inline"><mrow><mrow><mi>d</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><msub><mi>g</mi><mi>i</mi></msub></mrow><mo stretchy="false">←</mo><mrow><mn>1</mn><mo>+</mo><mrow><mo>⌊</mo><mfrac><mrow><mi>d</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>f</mi><mo>⁢</mo><msub><mi>f</mi><mi>i</mi></msub></mrow><msub><mi>δ</mi><mi>i</mi></msub></mfrac><mo>⌋</mo></mrow></mrow></mrow></math>
+
+</div>
+<div id="alg2.l21" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">21:</span></span>         <math id="alg2.l21.m1" class="ltx_Math" alttext="diag_{j}\leftarrow 1+\left\lfloor\frac{diff_{j}}{\delta_{j}}\right\rfloor" display="inline"><mrow><mrow><mi>d</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><msub><mi>g</mi><mi>j</mi></msub></mrow><mo stretchy="false">←</mo><mrow><mn>1</mn><mo>+</mo><mrow><mo>⌊</mo><mfrac><mrow><mi>d</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>f</mi><mo>⁢</mo><msub><mi>f</mi><mi>j</mi></msub></mrow><msub><mi>δ</mi><mi>j</mi></msub></mfrac><mo>⌋</mo></mrow></mrow></mrow></math>
+
+</div>
+<div id="alg2.l22" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">22:</span></span>         <math id="alg2.l22.m1" class="ltx_Math" alttext="length\leftarrow min(diag_{i},diag_{j})" display="inline"><mrow><mrow><mi>l</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>g</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>h</mi></mrow><mo stretchy="false">←</mo><mrow><mi>m</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mrow><mi>d</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><msub><mi>g</mi><mi>i</mi></msub></mrow><mo>,</mo><mrow><mi>d</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><msub><mi>g</mi><mi>j</mi></msub></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow></math>
+
+</div>
+<div id="alg2.l23" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">23:</span></span>         <span class="ltx_text ltx_font_bold">for</span> <math id="alg2.l23.m1" class="ltx_Math" alttext="\text{tile}\leftarrow\{0,\ldots,\text{length}-1\}\textbf{ parallel}" display="inline"><mrow><mtext>tile</mtext><mo stretchy="false">←</mo><mrow><mrow><mo stretchy="false">{</mo><mn>0</mn><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><mrow><mtext>length</mtext><mo>−</mo><mn>1</mn></mrow><mo stretchy="false">}</mo></mrow><mo>⁢</mo><mtext class="ltx_mathvariant_bold"> parallel</mtext></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg2.l24" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">24:</span></span>              <math id="alg2.l24.m1" class="ltx_Math" alttext="inner_{i}\leftarrow max(1,outer_{i}-(tile*\delta_{i}))" display="inline"><mrow><mrow><mi>i</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>i</mi></msub></mrow><mo stretchy="false">←</mo><mrow><mi>m</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>x</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mn>1</mn><mo>,</mo><mrow><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>i</mi></msub></mrow><mo>−</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>t</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>l</mi><mo>⁢</mo><mi>e</mi></mrow><mo lspace="0.222em" rspace="0.222em">∗</mo><msub><mi>δ</mi><mi>i</mi></msub></mrow><mo stretchy="false">)</mo></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow></math>
+
+</div>
+<div id="alg2.l25" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">25:</span></span>              <math id="alg2.l25.m1" class="ltx_Math" alttext="inner_{j}\leftarrow max(1,outer_{j}+(tile*\delta_{j}))" display="inline"><mrow><mrow><mi>i</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>j</mi></msub></mrow><mo stretchy="false">←</mo><mrow><mi>m</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>x</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mn>1</mn><mo>,</mo><mrow><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>j</mi></msub></mrow><mo>+</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>t</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>l</mi><mo>⁢</mo><mi>e</mi></mrow><mo lspace="0.222em" rspace="0.222em">∗</mo><msub><mi>δ</mi><mi>j</mi></msub></mrow><mo stretchy="false">)</mo></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow></math>
+
+</div>
+<div id="alg2.l26" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">26:</span></span>              <math id="alg2.l26.m1" class="ltx_Math" alttext="imax\leftarrow max(inner_{i}+\delta_{i},width)" display="inline"><mrow><mrow><mi>i</mi><mo>⁢</mo><mi>m</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>x</mi></mrow><mo stretchy="false">←</mo><mrow><mi>m</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>x</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>i</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>i</mi></msub></mrow><mo>+</mo><msub><mi>δ</mi><mi>i</mi></msub></mrow><mo>,</mo><mrow><mi>w</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>d</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>h</mi></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow></math>
+
+</div>
+<div id="alg2.l27" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">27:</span></span>              <math id="alg2.l27.m1" class="ltx_Math" alttext="jmax\leftarrow max(inner_{j}+\delta_{j},height)" display="inline"><mrow><mrow><mi>j</mi><mo>⁢</mo><mi>m</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>x</mi></mrow><mo stretchy="false">←</mo><mrow><mi>m</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>x</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>i</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>j</mi></msub></mrow><mo>+</mo><msub><mi>δ</mi><mi>j</mi></msub></mrow><mo>,</mo><mrow><mi>h</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>g</mi><mo>⁢</mo><mi>h</mi><mo>⁢</mo><mi>t</mi></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow></math>
+
+</div>
+<div id="alg2.l28" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">28:</span></span>              <span class="ltx_text ltx_font_bold">for</span> <math id="alg2.l28.m1" class="ltx_Math" alttext="\text{i}\leftarrow[inner_{i}\ldots imax]" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mo stretchy="false">[</mo><mrow><mi>i</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>i</mi></msub><mo>⁢</mo><mi mathvariant="normal">…</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>m</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>x</mi></mrow><mo stretchy="false">]</mo></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg2.l29" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">29:</span></span>                  <span class="ltx_text ltx_font_bold">for</span> <math id="alg2.l29.m1" class="ltx_Math" alttext="\text{j}\leftarrow[inner_{j}\ldots jmax]" display="inline"><mrow><mtext>j</mtext><mo stretchy="false">←</mo><mrow><mo stretchy="false">[</mo><mrow><mi>i</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>j</mi></msub><mo>⁢</mo><mi mathvariant="normal">…</mi><mo>⁢</mo><mi>j</mi><mo>⁢</mo><mi>m</mi><mo>⁢</mo><mi>a</mi><mo>⁢</mo><mi>x</mi></mrow><mo stretchy="false">]</mo></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg2.l30" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">30:</span></span>                       <span class="ltx_text ltx_font_bold">if</span> <math id="alg2.l30.m1" class="ltx_Math" alttext="\text{x[i-1]}=\text{y[j-1]}" display="inline"><mrow><mtext>x[i-1]</mtext><mo>=</mo><mtext>y[j-1]</mtext></mrow></math> <span class="ltx_text ltx_font_bold">then</span>
+
+</div>
+<div id="alg2.l31" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">31:</span></span>                           <math id="alg2.l31.m1" class="ltx_Math" alttext="\text{dp[i][j]}=\text{dp[i-1][j-1]}" display="inline"><mrow><mtext>dp[i][j]</mtext><mo>=</mo><mtext>dp[i-1][j-1]</mtext></mrow></math>
+
+</div>
+<div id="alg2.l32" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">32:</span></span>                       <span class="ltx_text ltx_font_bold">else</span>
+</div>
+<div id="alg2.l33" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">33:</span></span>                           <math id="alg2.l33.m1" class="ltx_Math" alttext="\text{dp[i][j]}=\text{min(dp[j-1][i-1] + pxy, dp[j-1][i] + pgap, dp[j][i-1] + %
+pgap)}" display="inline"><mrow><mtext>dp[i][j]</mtext><mo>=</mo><mtext>min(dp[j-1][i-1] + pxy, dp[j-1][i] + pgap, dp[j][i-1] + pgap)</mtext></mrow></math>
+                                                                
+</div>
+<div id="alg2.l34" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">34:</span></span>         <span class="ltx_text ltx_font_bold">if</span> <math id="alg2.l34.m1" class="ltx_Math" alttext="outer_{i}+\delta_{i}&lt;m" display="inline"><mrow><mrow><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>i</mi></msub></mrow><mo>+</mo><msub><mi>δ</mi><mi>i</mi></msub></mrow><mo>&lt;</mo><mi>m</mi></mrow></math> <span class="ltx_text ltx_font_bold">then</span>
+
+</div>
+<div id="alg2.l35" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">35:</span></span>              <math id="alg2.l35.m1" class="ltx_Math" alttext="outer_{i}\leftarrow outer_{i}+\delta_{i}" display="inline"><mrow><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>i</mi></msub></mrow><mo stretchy="false">←</mo><mrow><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>i</mi></msub></mrow><mo>+</mo><msub><mi>δ</mi><mi>i</mi></msub></mrow></mrow></math>
+
+</div>
+<div id="alg2.l36" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">36:</span></span>         <span class="ltx_text ltx_font_bold">else</span>
+</div>
+<div id="alg2.l37" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">37:</span></span>              <math id="alg2.l37.m1" class="ltx_Math" alttext="outer_{j}\leftarrow outer_{j}+\delta_{j}" display="inline"><mrow><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>j</mi></msub></mrow><mo stretchy="false">←</mo><mrow><mrow><mi>o</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>t</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>r</mi><mi>j</mi></msub></mrow><mo>+</mo><msub><mi>δ</mi><mi>j</mi></msub></mrow></mrow></math>
+              <span class="ltx_text ltx_font_bold">return </span> traceback(dp)
+
+</div>
+</div>
+</figure>
+<div class="ltx_pagination ltx_role_newpage"></div>
+<section id="S3.SS2.SSS1" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">3.2.1. </span>Restrictions</h4>
+
+<div id="S3.SS2.SSS1.p1" class="ltx_para">
+<p class="ltx_p">There was a restriction in the implementation of our algorithm, namely the amount of memory available proved constraining in exploiting further opportunities for parrallelism. Computing the sequence alignment among all <math id="S3.SS2.SSS1.p1.m1" class="ltx_Math" alttext="\frac{k(k-1)}{2}" display="inline"><mfrac><mrow><mi>k</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow><mo stretchy="false">)</mo></mrow></mrow><mn>2</mn></mfrac></math> pairs is “embarrassingly parallel”, however, this leads to far greater memory consumption and therefore wasn’t a valid optimisation given our memory restrictions.</p>
+</div>
+</section>
+<section id="S3.SS2.SSS2" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">3.2.2. </span>NUMA awareness</h4>
+
+<div id="S3.SS2.SSS2.p1" class="ltx_para">
+<p class="ltx_p">NUMA (non-uniform memory access) becomes an area of concern when considering programs that use multiple cores.
+More accurately, when multi-core programs require access to the same memory locations as each other and this sharing is performed over an interconnect.
+The policy used to help reduce the cost of NUMA in the Parallel implementation is called “First Touch”.
+“First Touch” ensures that the NUMA node to initialise some memory location, will have that page allocated on a memory device physically closer to the NUMA node.
+<br class="ltx_break">The steps for memory allocation can be given as follows:</p>
+<ul id="S3.I1" class="ltx_itemize">
+<li id="S3.I1.i1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i1.p1" class="ltx_para">
+<p class="ltx_p">dynamic memory allocation call (malloc/new)</p>
+</div>
+</li>
+<li id="S3.I1.i2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i2.p1" class="ltx_para">
+<p class="ltx_p">initial write attempt of dynamically allocated memory</p>
+</div>
+</li>
+<li id="S3.I1.i3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i3.p1" class="ltx_para">
+<p class="ltx_p">page fault triggered when write is attempted</p>
+</div>
+</li>
+<li id="S3.I1.i4" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i4.p1" class="ltx_para">
+<p class="ltx_p">physical allocation of memory performed and mapped via MMU</p>
+</div>
+</li>
+</ul>
+<p class="ltx_p">The parallel implementation exploits this property on moderns operating systems to help reduce the cost of non-uniform memory access. This is performed by initialising the
+matrix used for Smith-Waterman through multiple threads, ensuring that each NUMA node has a slice of the memory and thus a lower number of memory transfers are done over the interconnect, this is shown in <a href="#alg3" title="In Appendix A Appendix ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">algorithm</span> <span class="ltx_text ltx_ref_tag">3</span></a>.</p>
+</div>
+<div id="S3.SS2.SSS2.p2" class="ltx_para">
+<p class="ltx_p">While this is helpful for distributing the pages among the NUMA nodes, it comes at an additional processing cost. With the GNU 11.1.0 compiler toolchain, we are able to make use of the OpenMP allocator to do this distribution of pages, additionally some further optimisations maybe performed to increase performance, such as removing thread safety from the allocator and ensuring that the allocated memory is aligned, aligning memory is useful when using SIMD as load operations are much faster.</p>
+</div>
+</section>
+<section id="S3.SS2.SSS3" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">3.2.3. </span>Optimum tile size</h4>
+
+<div id="S3.SS2.SSS3.p1" class="ltx_para">
+<p class="ltx_p">The tile size presents a significant influence on the speedup of our algorithm, along with the scheduling algorithm used. The intuition regarding the dimensions of the tile size maybe to minimise it as much as possible, however, this is not always the optimial strategy. Likewise, it may seem that static scheduling maybe the most sensible given that each core would perform relatively the same amount of work, however, this is also untrue. A deeper discussion regarding the scheduling of wavefront parallelism on shared memory multiprocessors is provided in <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib4" class="ltx_ref">6</a>]</cite>. In our implementation, the tile size was determined by dividing the dimensions by a fixed number and the scheduling was performed dynamically, these details were determined through experimentation.</p>
+</div>
+</section>
+<section id="S3.SS2.SSS4" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">3.2.4. </span>Cache optimisations</h4>
+
+<div id="S3.SS2.SSS4.p1" class="ltx_para">
+<p class="ltx_p">Memory latencies play a significant role in the performance of programs, ensuring false sharing is minimal and maintaining locality of reference are important objectives for any high performance application. The processing of tiles in the wavefront processing of the matrix, helps obtain the previously mentioned objectives as shown by <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib4" class="ltx_ref">6</a>]</cite>. This is as a result of the layout of memory used in the matrix itself, the entire matrix is allocated as a single contiguous slice of memory. Consider the parallel traversal of the yellow diagonals below in <a href="#S3.F2" title="In 3.2.4. Cache optimisations ‣ 3.2. Parallel Algorithm ‣ 3. Proposed Approach ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">fig.</span> <span class="ltx_text ltx_ref_tag">2</span></a>. An isolated view of the potential cache lines for each core is also visible in <a href="#S3.F3" title="In 3.2.4. Cache optimisations ‣ 3.2. Parallel Algorithm ‣ 3. Proposed Approach ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">fig.</span> <span class="ltx_text ltx_ref_tag">3</span></a>, observe how given sufficient width of the matrix, false sharing is extremely unlikely. Additionally, note how the tiles are traversed horizontally and then vertically, this maintains locality of reference as the rows are contiguous in memory which is crucial to high performant code.</p>
+</div>
+<figure id="S3.F2" class="ltx_figure"><img src="/reports/parallel-smith-waterman/diag.png" id="S3.F2.g1" class="ltx_graphics ltx_centering ltx_img_square" width="121" height="121" alt="Parallel processing across matrix diagonals" loading="lazy" decoding="async">
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Figure 2. </span>Parallel processing of diagonals</figcaption>
+</figure>
+<figure id="S3.F3" class="ltx_figure"><img src="/reports/parallel-smith-waterman/cachelines.png" id="S3.F3.g1" class="ltx_graphics ltx_centering ltx_img_square" width="121" height="121" alt="Potential cache-line layout across matrix tiles" loading="lazy" decoding="async">
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Figure 3. </span>Potential cache lines</figcaption>
+</figure>
+</section>
+<section id="S3.SS2.SSS5" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">3.2.5. </span>Compiler optimisations</h4>
+
+<div id="S3.SS2.SSS5.p1" class="ltx_para">
+<p class="ltx_p">Compiler optimisations were heavily used to further increase the performance of the algorithm and frequent profiling of the program was done via the linux utility “perf“ <span id="footnote2" class="ltx_note ltx_role_footnote"><button type="button" class="ltx_note_mark" aria-label="Show footnote 2">2</button><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">2</sup><span class="ltx_tag ltx_tag_note">2</span>See <a href="https://perf.wiki.kernel.org/index.php/Main_Page" title="" class="ltx_ref ltx_url ltx_font_typewriter">https://perf.wiki.kernel.org/index.php/Main_Page</a></span></span></span>. It is important to note that using “std::string” had a significant impact on performance when dynamically linked to our program, this is as a result of symbol lookup performed in a tight loop when traversing the dynamic programming matrix. The remedy was to statically link the C++ standard library, which lead to a significant increase in performance, almost exactly the same performance characteristics as using a simple character array for holding the sequences. Additional optimisation recommendations from <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib3" class="ltx_ref">2</a>]</cite> were evaluated and used where appropriate. A critical optimisation used was the “-march=native” flag passed onto the GNU compiler, this flag targets the exact architecture that we are compiling the program for, this results in further architecture level optimisations being possible such as usage of AVX-512 <span id="footnote3" class="ltx_note ltx_role_footnote"><button type="button" class="ltx_note_mark" aria-label="Show footnote 3">3</button><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">3</sup><span class="ltx_tag ltx_tag_note">3</span>See <a href="https://www.intel.com.au/content/www/au/en/architecture-and-technology/avx-512-overview.html" title="" class="ltx_ref ltx_url ltx_font_typewriter">https://www.intel.com.au/content/www/au/en/architecture-and-technology/avx-512-overview.html</a></span></span></span>.</p>
+</div>
+</section>
+</section>
+</section>
+<section id="S4" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">4. </span>Experiments</h2>
+
+<section id="S4.SS1" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.1. </span>Experiment Environment</h3>
+
+<div id="S4.SS1.p1" class="ltx_para">
+<p class="ltx_p">Two experimentation environments were used throughout the development process. The development environment was used as a quick way to test and filter out
+ideas that weren’t viable, while valid ideas were tested on the Spartan High Performance Computing cloud <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib2" class="ltx_ref">7</a>]</cite>.</p>
+</div>
+<section id="S4.SS1.SSS1" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">4.1.1. </span>Development Environment</h4>
+
+<div id="S4.SS1.SSS1.p1" class="ltx_para">
+<ul id="S4.I1" class="ltx_itemize">
+<li id="S4.I1.i1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S4.I1.i1.p1" class="ltx_para">
+<p class="ltx_p">CPU - AMD Ryzen™ 7 3700X @ 3.6-4.4GHz</p>
+</div>
+</li>
+<li id="S4.I1.i2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S4.I1.i2.p1" class="ltx_para">
+<p class="ltx_p">Memory - 32GB</p>
+</div>
+</li>
+<li id="S4.I1.i3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S4.I1.i3.p1" class="ltx_para">
+<p class="ltx_p">Compiler - GNU 11.1.0</p>
+</div>
+</li>
+</ul>
+</div>
+</section>
+<section id="S4.SS1.SSS2" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">4.1.2. </span>Spartan Environment</h4>
+
+<div id="S4.SS1.SSS2.p1" class="ltx_para">
+<ul id="S4.I2" class="ltx_itemize">
+<li id="S4.I2.i1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S4.I2.i1.p1" class="ltx_para">
+<p class="ltx_p">CPU - Intel(R) Xeon(R) Gold 6154 CPU @ 3.00-3.7GHz</p>
+</div>
+</li>
+<li id="S4.I2.i2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S4.I2.i2.p1" class="ltx_para">
+<p class="ltx_p">Memory - 32GB</p>
+</div>
+</li>
+<li id="S4.I2.i3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S4.I2.i3.p1" class="ltx_para">
+<p class="ltx_p">Compiler - GNU 10.3.0</p>
+</div>
+</li>
+</ul>
+</div>
+</section>
+</section>
+<section id="S4.SS2" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.2. </span>Results</h3>
+
+<div id="S4.SS2.p1" class="ltx_para">
+<p class="ltx_p">The results after running our parallel algorithm on the “mseq-big13-example” data provided are shown in <a href="#S4.F4" title="In 4.2. Results ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">fig.</span> <span class="ltx_text ltx_ref_tag">4</span></a> and presented in below in <a href="#S4.T1" title="In 4.2. Results ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">table</span> <span class="ltx_text ltx_ref_tag">1</span></a>.</p>
+</div>
+<figure id="S4.F4" class="ltx_figure"><img src="/reports/parallel-smith-waterman/res.png" id="S4.F4.g1" class="ltx_graphics ltx_centering ltx_img_landscape" width="384" height="288" alt="Smith-Waterman runtime results by core count" loading="lazy" decoding="async">
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Figure 4. </span>Results observed</figcaption>
+</figure>
+<figure id="S4.T1" class="ltx_table">
+<table class="ltx_tabular ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">Core(s)</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_rr ltx_border_t">Walltime(microseconds)</th>
+</tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">1</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">923129129 <math id="S4.T1.m1" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">2</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">491227097 <math id="S4.T1.m2" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">8</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">169576852 <math id="S4.T1.m3" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">16</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">119517599 <math id="S4.T1.m4" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">24</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">112753964 <math id="S4.T1.m5" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">32</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">111237046 <math id="S4.T1.m6" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_b ltx_border_ll ltx_border_r ltx_border_t">36</th>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_rr ltx_border_t">108483498 <math id="S4.T1.m7" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+</tbody>
+</table>
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_table">Table 1. </span>Walltime per number of cores</figcaption>
+</figure>
+</section>
+<section id="S4.SS3" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.3. </span>Determining Efficiency</h3>
+
+<div id="S4.SS3.p1" class="ltx_para">
+<p class="ltx_p">The efficiency( <math id="S4.SS3.p1.m1" class="ltx_Math" alttext="\eta(n)" display="inline"><mrow><mi>η</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow></math> ) of our algorithm can be determined by the following formula:</p>
+<table id="S4.E1" class="ltx_equation ltx_eqn_table">
+
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td rowspan="1" class="ltx_eqn_cell ltx_eqn_eqno ltx_align_middle ltx_align_left"><span class="ltx_tag ltx_tag_equation ltx_align_left">(1)</span></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="S4.E1.m1" class="ltx_Math" alttext="\eta(n)=\frac{\text{Speedup(n)}}{\text{p(n)}}" display="block"><mrow><mrow><mi>η</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow><mo>=</mo><mfrac><mtext>Speedup(n)</mtext><mtext>p(n)</mtext></mfrac></mrow></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<p class="ltx_p">The efficiency for the results shown in <a href="#S4.T1" title="In 4.2. Results ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">table</span> <span class="ltx_text ltx_ref_tag">1</span></a> have been calculated using <a href="#S4.E1" title="In 4.3. Determining Efficiency ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">eq.</span> <span class="ltx_text ltx_ref_tag">1</span></a> and displayed in <a href="#S4.SS3" title="4.3. Determining Efficiency ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">section</span> <span class="ltx_text ltx_ref_tag">4.3</span></a>.</p>
+</div>
+<figure id="S4.SS3.tab1" class="ltx_table">
+<table class="ltx_tabular ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">Core(s)</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_rr ltx_border_t">Efficiency</th>
+</tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">1</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">1.572</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">2</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">1.478</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">8</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">1.070</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">16</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.759</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">24</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.537</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">32</th>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.408</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_b ltx_border_ll ltx_border_r ltx_border_t">36</th>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_rr ltx_border_t">0.372</td>
+</tr>
+</tbody>
+</table>
+</figure>
+</section>
+<section id="S4.SS4" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.4. </span>Exploring implications of tile size</h3>
+
+<figure id="S4.T2" class="ltx_table">
+<table class="ltx_tabular ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_ll ltx_border_r ltx_border_t">Core(s)</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Tile Size</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_rr ltx_border_t">Walltime(microseconds)</th>
+</tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">8</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t"><math id="S4.T2.m1" class="ltx_Math" alttext="(\frac{m}{8}+1,\frac{n}{8}+1)" display="inline"><mrow><mo stretchy="false">(</mo><mrow><mfrac><mi>m</mi><mn>8</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo>,</mo><mrow><mfrac><mi>n</mi><mn>8</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo stretchy="false">)</mo></mrow></math></td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">379606318 <math id="S4.T2.m2" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">16</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t"><math id="S4.T2.m3" class="ltx_Math" alttext="(\frac{m}{16}+1,\frac{n}{16}+1)" display="inline"><mrow><mo stretchy="false">(</mo><mrow><mfrac><mi>m</mi><mn>16</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo>,</mo><mrow><mfrac><mi>n</mi><mn>16</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo stretchy="false">)</mo></mrow></math></td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">382288384 <math id="S4.T2.m4" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">24</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t"><math id="S4.T2.m5" class="ltx_Math" alttext="(\frac{m}{24}+1,\frac{n}{24}+1)" display="inline"><mrow><mo stretchy="false">(</mo><mrow><mfrac><mi>m</mi><mn>24</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo>,</mo><mrow><mfrac><mi>n</mi><mn>24</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo stretchy="false">)</mo></mrow></math></td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">388430562 <math id="S4.T2.m6" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">32</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t"><math id="S4.T2.m7" class="ltx_Math" alttext="(\frac{m}{32}+1,\frac{n}{32}+1)" display="inline"><mrow><mo stretchy="false">(</mo><mrow><mfrac><mi>m</mi><mn>32</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo>,</mo><mrow><mfrac><mi>n</mi><mn>32</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo stretchy="false">)</mo></mrow></math></td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">385640454 <math id="S4.T2.m8" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_ll ltx_border_r ltx_border_t">36</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t"><math id="S4.T2.m9" class="ltx_Math" alttext="(\frac{m}{36}+1,\frac{n}{36}+1)" display="inline"><mrow><mo stretchy="false">(</mo><mrow><mfrac><mi>m</mi><mn>36</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo>,</mo><mrow><mfrac><mi>n</mi><mn>36</mn></mfrac><mo>+</mo><mn>1</mn></mrow><mo stretchy="false">)</mo></mrow></math></td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_rr ltx_border_t">381233563 <math id="S4.T2.m10" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>
+</td>
+</tr>
+</tbody>
+</table>
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_table">Table 2. </span>Walltime per number of cores and tile size</figcaption>
+</figure>
+</section>
+<section id="S4.SS5" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.5. </span>Discussion</h3>
+
+<div id="S4.SS5.p1" class="ltx_para">
+<p class="ltx_p"><span class="ltx_text ltx_font_bold">Note: </span> The sequential implementation was measured to have taken 1451965419 <math id="S4.SS5.p1.m1" class="ltx_Math" alttext="\mu s" display="inline"><mrow><mi>μ</mi><mo>⁢</mo><mi>s</mi></mrow></math>.
+
+
+<br class="ltx_break">The results were extremely surprising, note that the single core parallel algorithm is far more performant than the sequential algorithm. While this was unexpected, this is likely due to the substantial amount of micro optimisations and time spent on the implementation of the parallel algorithm itself rather than the complexity properties of the parallel algorithm itself.
+
+
+<br class="ltx_break">The choice of cores to test were not random, they were also made with the intention of determining the effectiveness of our NUMA mitigation strategy mentioned previously. The processor used consisted of 18 cores, this fact ensures that when the core count requested is above 18, we are guaranteed to encounter at least two NUMA nodes. Note that, in practice, this number was in fact much higher at 3-5 NUMA nodes per experiment. The results in <a href="#S4.T1" title="In 4.2. Results ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">table</span> <span class="ltx_text ltx_ref_tag">1</span></a> show that our NUMA mitigation strategy was effective, although NUMA certainly would have contributed in adding latencies to our calculations as our core count went up, the increase in parallelism was able to counteract this. The decrease in efficiency as core count increased, demonstrated in <a href="#S4.SS3" title="4.3. Determining Efficiency ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">section</span> <span class="ltx_text ltx_ref_tag">4.3</span></a> is likely a function of NUMA costs and the limit on the parallelisability of the problem itself.
+
+<br class="ltx_break">
+<br class="ltx_break">As stated previously, the tile size has a significant impact on the parallelisability of the problem. As shown in <a href="#S4.T2" title="In 4.4. Exploring implications of tile size ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">table</span> <span class="ltx_text ltx_ref_tag">2</span></a>, choosing a bad tile size may mean the parallelisability of the problem is artificially limited. The results in <a href="#S4.T1" title="In 4.2. Results ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">table</span> <span class="ltx_text ltx_ref_tag">1</span></a>, <a href="#S4.F4" title="In 4.2. Results ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">fig.</span> <span class="ltx_text ltx_ref_tag">4</span></a> and <a href="#S4.SS3" title="4.3. Determining Efficiency ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">section</span> <span class="ltx_text ltx_ref_tag">4.3</span></a> are a result of dynamically choosing the tile size based on the dimensions of the matrix. To be exact, the dimensions of the matrix were divided by 13, determining this number was through experimentation on the development environment.</p>
+</div>
+</section>
+</section>
+<section id="S5" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">5. </span>Further Work</h2>
+
+<section id="S5.SS1" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">5.1. </span>Generation of tiles</h3>
+
+<div id="S5.SS1.p1" class="ltx_para">
+<p class="ltx_p">The parallel algorithm implemented does not make full use of the available computing power. When tiles are iterated over, they must wait until all the tiles in the same diagonal have completed their work. This is an unnecessary restriction, as it results in a large amount of time spent on the barrier.
+Further work could explore how to reduce the level of granularity in our dependencies, new tiles could simply be generated after a single tiles work unit has completed. A simple algorithm would be to start processing tile <math id="S5.SS1.p1.m1" class="ltx_Math" alttext="(i+\delta_{i},j)" display="inline"><mrow><mo stretchy="false">(</mo><mrow><mi>i</mi><mo>+</mo><msub><mi>δ</mi><mi>i</mi></msub></mrow><mo>,</mo><mi>j</mi><mo stretchy="false">)</mo></mrow></math> and <math id="S5.SS1.p1.m2" class="ltx_Math" alttext="(i,j+\delta_{j})" display="inline"><mrow><mo stretchy="false">(</mo><mi>i</mi><mo>,</mo><mrow><mi>j</mi><mo>+</mo><msub><mi>δ</mi><mi>j</mi></msub></mrow><mo stretchy="false">)</mo></mrow></math> when <math id="S5.SS1.p1.m3" class="ltx_Math" alttext="(i,j)" display="inline"><mrow><mo stretchy="false">(</mo><mi>i</mi><mo>,</mo><mi>j</mi><mo stretchy="false">)</mo></mrow></math> has completed its unit of work, this does however introduce the problem of tiles being visited more than once but this could simply be avoided through using a xorfilter to determine if a pair of indices have been visited before.</p>
+</div>
+</section>
+<section id="S5.SS2" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">5.2. </span>Inter-sequence SIMD parallelism</h3>
+
+<div id="S5.SS2.p1" class="ltx_para">
+<p class="ltx_p">We could apply inter-sequence SIMD parallelism into our current thread-parallel implementation to obtain instruction level parallelism.
+While this is plausible, an important consideration that warrants investigation is determining an efficient method to move data from the heap and into the SIMD register, this technique will likely have significant speedups with AVX-512.</p>
+</div>
+</section>
+</section>
+<section id="S6" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">6. </span>Conclusion</h2>
+
+<div id="S6.p1" class="ltx_para">
+<p class="ltx_p">We have demonstrated how OpenMP may be used to develop a parallel algorithm for optimal local alignment of sequences. The algorithm developed showed effective use of parallelism to achieve a significant speedup of 13 over the sequential algorithm.</p>
+</div>
+</section>
+<section id="bib" class="ltx_bibliography">
+<h2 class="ltx_title ltx_title_bibliography">References</h2>
+
+<ul id="bib.L1" class="ltx_biblist">
+<li id="bib.bib7" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">S. F. Altschul, T. L. Madden, A. A. Schäffer, J. Zhang, Z. Zhang, W. Miller, and D. J. Lipman (1997)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Gapped blast and psi-blast: a new generation of protein database search programs</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Nucleic acids research</span> <span class="ltx_text ltx_bib_volume">25</span> (<span class="ltx_text ltx_bib_number">17</span>), <span class="ltx_text ltx_bib_pages"> pp. 3389–3402</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p1" title="2. Related Work ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib3" class="ltx_bibitem ltx_bib_misc">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">A. Fog (2020)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Optimizing software in c++</span>.
+</span>
+<span class="ltx_bibblock"> <span class="ltx_text ltx_bib_publisher">Self-publishing</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S3.SS2.SSS5.p1" title="3.2.5. Compiler optimisations ‣ 3.2. Parallel Algorithm ‣ 3. Proposed Approach ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§3.2.5</span></a>.
+</span>
+</li>
+<li id="bib.bib9" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">C. Lameter (2013)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">An overview of non-uniform memory access</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Communications of the ACM</span> <span class="ltx_text ltx_bib_volume">56</span> (<span class="ltx_text ltx_bib_number">9</span>), <span class="ltx_text ltx_bib_pages"> pp. 59–54</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#A1.p1" title="Appendix A Appendix ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">Appendix A</span></a>.
+</span>
+</li>
+<li id="bib.bib10" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">I. T. Li, W. Shum, and K. Truong (2007)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">160-fold acceleration of the smith-waterman algorithm using a field programmable gate array (fpga)</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">BMC bioinformatics</span> <span class="ltx_text ltx_bib_volume">8</span> (<span class="ltx_text ltx_bib_number">1</span>), <span class="ltx_text ltx_bib_pages"> pp. 1–7</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p4" title="2. Related Work ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib11" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">S. A. Manavski and G. Valle (2008)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">CUDA compatible gpu cards as efficient hardware accelerators for smith-waterman sequence alignment</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">BMC bioinformatics</span> <span class="ltx_text ltx_bib_volume">9</span> (<span class="ltx_text ltx_bib_number">2</span>), <span class="ltx_text ltx_bib_pages"> pp. 1–9</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p3" title="2. Related Work ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib4" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">N. Manjikian and T. S. Abdelrahman (1996)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Scheduling of wavefront parallelism on scalable shared-memory multiprocessors</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">Proceedings of the 1996 ICPP Workshop on Challenges for Parallel Processing</span>,
+</span>
+<span class="ltx_bibblock">Vol. <span class="ltx_text ltx_bib_volume">3</span>, <span class="ltx_text ltx_bib_pages"> pp. 122–131</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S3.SS2.SSS3.p1" title="3.2.3. Optimum tile size ‣ 3.2. Parallel Algorithm ‣ 3. Proposed Approach ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§3.2.3</span></a>,
+<a href="#S3.SS2.SSS4.p1" title="3.2.4. Cache optimisations ‣ 3.2. Parallel Algorithm ‣ 3. Proposed Approach ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§3.2.4</span></a>.
+</span>
+</li>
+<li id="bib.bib2" class="ltx_bibitem ltx_bib_misc">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">B. MEADE, L. LAFAYETTE, G. Sauter, and D. TOSELLO (2017)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Spartan hpc-cloud hybrid: delivering performance and flexibility</span>.
+</span>
+<span class="ltx_bibblock"> <span class="ltx_text ltx_bib_publisher">University of Melbourne</span>.
+</span>
+<span class="ltx_bibblock">External Links: <span class="ltx_text ltx_bib_links"><a href="https://melbourne.figshare.com/articles/online_resource/Spartan_HPC-Cloud_Hybrid_Delivering_Performance_and_Flexibility/4768291/1" title="" class="ltx_ref ltx_bib_external">Link</a>,
+<a href="https://dx.doi.org/10.4225/49/58ead90dceaaa" title="" class="ltx_ref doi ltx_bib_external">Document</a></span>
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S4.SS1.p1" title="4.1. Experiment Environment ‣ 4. Experiments ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§4.1</span></a>.
+</span>
+</li>
+<li id="bib.bib6" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">W. R. Pearson and D. J. Lipman (1988)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Improved tools for biological sequence comparison</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Proceedings of the National Academy of Sciences</span> <span class="ltx_text ltx_bib_volume">85</span> (<span class="ltx_text ltx_bib_number">8</span>), <span class="ltx_text ltx_bib_pages"> pp. 2444–2448</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p1" title="2. Related Work ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib13" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">T. Rognes and E. Seeberg (2000)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Six-fold speed-up of smith–waterman sequence database searches using parallel processing on common microprocessors</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Bioinformatics</span> <span class="ltx_text ltx_bib_volume">16</span> (<span class="ltx_text ltx_bib_number">8</span>), <span class="ltx_text ltx_bib_pages"> pp. 699–706</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p2" title="2. Related Work ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib1" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">T. F. Smith, M. S. Waterman, <span class="ltx_text ltx_bib_etal">et al.</span> (1981)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Identification of common molecular subsequences</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Journal of molecular biology</span> <span class="ltx_text ltx_bib_volume">147</span> (<span class="ltx_text ltx_bib_number">1</span>), <span class="ltx_text ltx_bib_pages"> pp. 195–197</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S1.p1" title="1. Background ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§1</span></a>.
+</span>
+</li>
+<li id="bib.bib8" class="ltx_bibitem ltx_bib_report">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">O. O. Storaasli and D. Strenski (2007)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Accelerating genome sequencing 100x with fpgas</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_type">Technical report</span>
+</span>
+<span class="ltx_bibblock"> <span class="ltx_text ltx_bib_publisher">Oak Ridge National Lab.(ORNL), Oak Ridge, TN (United States)</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p4" title="2. Related Work ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib12" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">M. Zhao, W. Lee, E. P. Garrison, and G. T. Marth (2013)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">SSW library: an simd smith-waterman c/c++ library for use in genomic applications</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">PloS one</span> <span class="ltx_text ltx_bib_volume">8</span> (<span class="ltx_text ltx_bib_number">12</span>), <span class="ltx_text ltx_bib_pages"> pp. e82138</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p2" title="2. Related Work ‣ Parallel Smith-Waterman with OpenMP" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+</ul>
+</section>
+<section id="A1" class="ltx_appendix">
+<h2 class="ltx_title ltx_title_appendix">
+<span class="ltx_tag ltx_tag_appendix">Appendix A </span>Appendix</h2>
+
+<figure id="alg3" class="ltx_float ltx_float_algorithm ltx_framed ltx_framed_top">
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_float"><span class="ltx_text ltx_font_bold">Algorithm 3</span> </span> Parallel Matrix initialisation</figcaption>
+<div class="ltx_listing ltx_listing">
+<div id="alg3.l1" class="ltx_listingline">
+<span class="ltx_text ltx_font_bold">procedure</span> <span class="ltx_text ltx_font_smallcaps">NewMatrix</span>
+
+</div>
+<div id="alg3.l2" class="ltx_listingline">     <math id="alg3.l2.m1" class="ltx_Math" alttext="\text{m,n}\leftarrow\text{dimensions of }\textit{matrix}" display="inline"><mrow><mtext>m,n</mtext><mo stretchy="false">←</mo><mrow><mtext>dimensions of </mtext><mtext class="ltx_mathvariant_italic">matrix</mtext></mrow></mrow></math>
+
+</div>
+<div id="alg3.l3" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">3:</span></span>     <math id="alg3.l3.m1" class="ltx_Math" alttext="\text{dp}\leftarrow\text{malloc(sizeof(int *)*m)}" display="inline"><mrow><mtext>dp</mtext><mo stretchy="false">←</mo><mtext>malloc(sizeof(int *)*m)</mtext></mrow></math>
+
+</div>
+<div id="alg3.l4" class="ltx_listingline">     <math id="alg3.l4.m1" class="ltx_Math" alttext="\text{size}\leftarrow\textit{m*n}" display="inline"><mrow><mtext>size</mtext><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">m*n</mtext></mrow></math>
+
+</div>
+<div id="alg3.l5" class="ltx_listingline">     <math id="alg3.l5.m1" class="ltx_Math" alttext="\text{dp0}\leftarrow\text{malloc(sizeof(int)*size)}" display="inline"><mrow><mtext>dp0</mtext><mo stretchy="false">←</mo><mtext>malloc(sizeof(int)*size)</mtext></mrow></math>
+
+</div>
+<div id="alg3.l6" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">6:</span></span>     <span class="ltx_text ltx_font_bold">for</span> <math id="alg3.l6.m1" class="ltx_Math" alttext="\text{i}\leftarrow\{0,\ldots,\text{size}-1\}\textbf{ parallel}" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mrow><mo stretchy="false">{</mo><mn>0</mn><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><mrow><mtext>size</mtext><mo>−</mo><mn>1</mn></mrow><mo stretchy="false">}</mo></mrow><mo>⁢</mo><mtext class="ltx_mathvariant_bold"> parallel</mtext></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg3.l7" class="ltx_listingline">         <math id="alg3.l7.m1" class="ltx_Math" alttext="\text{dp0[0]}\leftarrow 0" display="inline"><mrow><mtext>dp0[0]</mtext><mo stretchy="false">←</mo><mn>0</mn></mrow></math>
+     
+</div>
+<div id="alg3.l8" class="ltx_listingline">     <span class="ltx_text ltx_font_bold">for</span> <math id="alg3.l8.m1" class="ltx_Math" alttext="\text{i}\leftarrow\{0,\ldots,m-1\}\textbf{ parallel}" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mrow><mo stretchy="false">{</mo><mn>0</mn><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><mrow><mi>m</mi><mo>−</mo><mn>1</mn></mrow><mo stretchy="false">}</mo></mrow><mo>⁢</mo><mtext class="ltx_mathvariant_bold"> parallel</mtext></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg3.l9" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">9:</span></span>         <math id="alg3.l9.m1" class="ltx_Math" alttext="\text{dp[0]}\leftarrow 0" display="inline"><mrow><mtext>dp[0]</mtext><mo stretchy="false">←</mo><mn>0</mn></mrow></math>
+     
+</div>
+<div id="alg3.l10" class="ltx_listingline">     <math id="alg3.l10.m1" class="ltx_Math" alttext="\text{dp[0]}\leftarrow\text{dp0}" display="inline"><mrow><mtext>dp[0]</mtext><mo stretchy="false">←</mo><mtext>dp0</mtext></mrow></math>
+
+</div>
+<div id="alg3.l11" class="ltx_listingline">     <span class="ltx_text ltx_font_bold">for</span> <math id="alg3.l11.m1" class="ltx_Math" alttext="\text{i}\leftarrow\{1,\ldots,m-1\}" display="inline"><mrow><mtext>i</mtext><mo stretchy="false">←</mo><mrow><mo stretchy="false">{</mo><mn>1</mn><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><mrow><mi>m</mi><mo>−</mo><mn>1</mn></mrow><mo stretchy="false">}</mo></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg3.l12" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">12:</span></span>         <math id="alg3.l12.m1" class="ltx_Math" alttext="\text{dp[0]}\leftarrow\text{dp[i-1] + n}" display="inline"><mrow><mtext>dp[0]</mtext><mo stretchy="false">←</mo><mtext>dp[i-1] + n</mtext></mrow></math>
+     
+</div>
+<div id="alg3.l13" class="ltx_listingline">     <span class="ltx_text ltx_markedasmath ltx_font_bold">return </span><span class="ltx_text ltx_markedasmath">dp</span>
+
+</div>
+</div>
+</figure>
+<div class="ltx_pagination ltx_role_newpage"></div>
+<div id="A1.p1" class="ltx_para">
+<p class="ltx_p"></p>
+</div>
+</section>
+</article>

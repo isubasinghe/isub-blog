@@ -1,0 +1,1382 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Incremental, Data-Parallel Graph Clustering</title><meta name="description" content="A thesis exploring a parallel and incremental modification of Louvain community detection using Differential Dataflow."><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.wiki-link.broken{color:#b00020;text-decoration:underline dotted #b00020;cursor:help}.wiki-breadcrumbs{font-size:.95rem;margin-bottom:1rem;color:#555}.wiki-breadcrumbs a{font-size:.95rem}.wiki-children,.wiki-siblings,.wiki-backlinks{margin-top:2.5rem;border-top:1px solid #ddd;padding-top:1rem}.wiki-children h2,.wiki-siblings h2,.wiki-backlinks h2{font-size:1rem;color:#666;margin-bottom:.5rem;font-weight:400;text-transform:uppercase;letter-spacing:.05em}#wiki-graph{width:100%;height:70vh;border:1px solid #ddd;border-radius:4px}.container[data-astro-cid-37fxchfa]{max-width:56rem;margin:0 auto;margin-top:2rem;padding:0 1.5rem}
+a[data-astro-cid-g5kbnxd7]{text-decoration:none}
+</style>
+<link rel="stylesheet" href="/_astro/_slug_.BE7AxQzX.css"><script type="module" src="/_astro/page.DGRhADao.js"></script></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <div class="report-toolbar" data-astro-cid-6l5vyk3t> <a href="/reports" data-astro-cid-g5kbnxd7>&lt;</a>   </div> <div class="technical-report"><!-- Generated from reports/incremental-data-parallel-graph-clustering/report.tex. Do not edit directly. -->
+<article aria-labelledby="technical-report-title" class="ltx_document ltx_authors_1line">
+<h1 id="technical-report-title" class="ltx_title ltx_title_document">Incremental, Data-Parallel Graph Clustering</h1>
+<div class="ltx_authors">
+<span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Isitha Subasinghe
+<br class="ltx_break">University of Melbourne
+<br class="ltx_break">Master of Information Technology
+</span></span>
+</div>
+
+<div class="ltx_abstract">
+<h6 class="ltx_title ltx_title_abstract">Abstract</h6>
+<p class="ltx_p">Community extraction has become a fundamental operation in numerous real world applications.
+We propose a simple modification to the traditional Louvain method <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib38" class="ltx_ref">6</a>]</cite> that is used for the detection of community structures in large networks.
+The modification is aimed to enable parallel and incremental processing of network structures, such that
+the algorithm can be applied in stream processing settings.</p>
+</div>
+<section id="Chx1" class="ltx_chapter">
+<h2 class="ltx_title ltx_title_chapter">Declaration of Authorship</h2>
+
+<div id="Chx1.p1" class="ltx_para">
+<p class="ltx_p">I, Isitha Subasinghe, declare that this thesis titled, ‘Incremental, Data-Parallel Graph Clustering’ and the work presented in it are my own. I confirm that:</p>
+</div>
+<div id="Chx1.p2" class="ltx_para">
+<ul id="Chx1.S0.I1" class="ltx_itemize">
+<li id="Chx1.S0.I1.ix1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item"><math id="Chx1.S0.I1.ix1.m1" class="ltx_Math" alttext="\blacksquare" display="inline"><mi mathsize="50%" mathvariant="normal">■</mi></math></span> 
+<div id="Chx1.S0.I1.ix1.p1" class="ltx_para">
+<p class="ltx_p">The thesis comprises only my original work towards the ‘Masters of Information Technology’ except where indicated in the preface;</p>
+</div>
+</li>
+<li id="Chx1.S0.I1.ix2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item"><math id="Chx1.S0.I1.ix2.m1" class="ltx_Math" alttext="\blacksquare" display="inline"><mi mathsize="50%" mathvariant="normal">■</mi></math></span> 
+<div id="Chx1.S0.I1.ix2.p1" class="ltx_para">
+<p class="ltx_p">due acknowledgement has been made in the text to all other material used; and</p>
+</div>
+</li>
+<li id="Chx1.S0.I1.ix3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item"><math id="Chx1.S0.I1.ix3.m1" class="ltx_Math" alttext="\blacksquare" display="inline"><mi mathsize="50%" mathvariant="normal">■</mi></math></span> 
+<div id="Chx1.S0.I1.ix3.p1" class="ltx_para">
+<p class="ltx_p">the thesis is fewer than the maximum word limit in length, exclusive of tables, maps, bibliographies and appendices as approved by the Research Higher Degrees Committee.
+
+<br class="ltx_break"></p>
+</div>
+</li>
+</ul>
+</div>
+<div id="Chx1.p3" class="ltx_para">
+<p class="ltx_p">Signed:
+<br class="ltx_break"><span class="ltx_rule" style="width:250.0pt;height:0.5pt;position:relative; bottom:10.0pt;background:black;display:inline-block;"> </span></p>
+</div>
+<div id="Chx1.p4" class="ltx_para">
+<p class="ltx_p">Date:
+<br class="ltx_break"><span class="ltx_rule" style="width:250.0pt;height:0.5pt;position:relative; bottom:10.0pt;background:black;display:inline-block;"> </span></p>
+</div>
+</section>
+<section id="Chx2" class="ltx_chapter">
+<h2 class="ltx_title ltx_title_chapter">Preface</h2>
+
+</section>
+<section id="Chx3" class="ltx_chapter">
+<h2 class="ltx_title ltx_title_chapter">Acknowledgements</h2>
+
+<div id="Chx3.p1" class="ltx_para">
+<p class="ltx_p">I would like to thank my supervisor, Dr. Shanika Karunasekera for her time, knowledge and help throughout the semester, I am thankful that I was able to have a looser idea of what my research project was, entering the semester and for the suggestions on what topics to avoid. I am also thankful for making the time for a small chat when I needed motivation and providing me more context as to what life in academia was like. I am also grateful for the suggestion to not explore how Differential Dataflow could be used for incremental processing of Conflict-free Replicated Data Types, while this would be an extremely interesting topic, it would also have been much more difficult and deserved more time and attention than the 3 months that I had.
+I am also grateful to Dr. Frank McSherry for the implementation of Differential Dataflow and answering my various questions regarding its usage although he had no reason to help me.</p>
+</div>
+<nav class="ltx_TOC ltx_list_toc ltx_toc_toc"><h6 class="ltx_title ltx_title_contents">Contents</h6>
+<ol class="ltx_toclist">
+<li class="ltx_tocentry ltx_tocentry_chapter">
+<a href="#Ch1" title="In Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">1 </span>Introduction</span></a>
+<ol class="ltx_toclist ltx_toclist_chapter">
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch1.S1" title="In Chapter 1 Introduction ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">1.1 </span>Introduction</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch1.S2" title="In Chapter 1 Introduction ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">1.2 </span>Problem Statement and notation</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section">
+<a href="#Ch1.S3" title="In Chapter 1 Introduction ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">1.3 </span>Motivation</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch1.S3.SS1" title="In 1.3 Motivation ‣ Chapter 1 Introduction ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">1.3.1 </span>Differential Dataflow</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch1.S3.SS2" title="In 1.3 Motivation ‣ Chapter 1 Introduction ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">1.3.2 </span>Louvain</span></a></li>
+</ol>
+</li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_chapter">
+<a href="#Ch2" title="In Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2 </span>Background &amp; Related Work</span></a>
+<ol class="ltx_toclist ltx_toclist_chapter">
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch2.S1" title="In Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.1 </span>Graph Partitioning</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch2.S2" title="In Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.2 </span>Incremental Computation</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch2.S3" title="In Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.3 </span>Incremental View Maintenance</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch2.S4" title="In Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.4 </span>Incremental Dataflow</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch2.S5" title="In Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.5 </span>Iterative Dataflow</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch2.S6" title="In Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.6 </span>Modularity Optimisation</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch2.S7" title="In Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.7 </span>The Louvain Algorithm</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch2.S8" title="In Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">2.8 </span>Limits of modularity</span></a></li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_chapter">
+<a href="#Ch3" title="In Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3 </span>Method</span></a>
+<ol class="ltx_toclist ltx_toclist_chapter">
+<li class="ltx_tocentry ltx_tocentry_section">
+<a href="#Ch3.S1" title="In Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.1 </span>Parallel Louvain</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch3.S1.SS1" title="In 3.1 Parallel Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.1.1 </span>Negative gain scenario</span></a></li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_section">
+<a href="#Ch3.S2" title="In Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2 </span>Dataflow Louvain</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch3.S2.SS1" title="In 3.2 Dataflow Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2.1 </span>Non-termination</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch3.S2.SS2" title="In 3.2 Dataflow Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2.2 </span>Counterfactual swapping</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch3.S2.SS3" title="In 3.2 Dataflow Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2.3 </span>Recognising where deadlocks (non-termination) may occur</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch3.S2.SS4" title="In 3.2 Dataflow Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2.4 </span>Implementation</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch3.S2.SS5" title="In 3.2 Dataflow Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2.5 </span>Challenges</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch3.S2.SS6" title="In 3.2 Dataflow Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">3.2.6 </span>Limitations</span></a></li>
+</ol>
+</li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_chapter">
+<a href="#Ch4" title="In Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">4 </span>Experiments</span></a>
+<ol class="ltx_toclist ltx_toclist_chapter">
+<li class="ltx_tocentry ltx_tocentry_section">
+<a href="#Ch4.S1" title="In Chapter 4 Experiments ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">4.1 </span>Experiment setup</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch4.S1.SS1" title="In 4.1 Experiment setup ‣ Chapter 4 Experiments ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">4.1.1 </span>Justification of Apache Spark based Louvain method for baseline</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch4.S1.SS2" title="In 4.1 Experiment setup ‣ Chapter 4 Experiments ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">4.1.2 </span>Disadvantages impacting Differential Dataflow</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch4.S1.SS3" title="In 4.1 Experiment setup ‣ Chapter 4 Experiments ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">4.1.3 </span>Testing Environment</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch4.S1.SS4" title="In 4.1 Experiment setup ‣ Chapter 4 Experiments ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">4.1.4 </span>Datasets</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch4.S1.SS5" title="In 4.1 Experiment setup ‣ Chapter 4 Experiments ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">4.1.5 </span>Experimental Process</span></a></li>
+</ol>
+</li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_chapter">
+<a href="#Ch5" title="In Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5 </span>Results &amp; Discussion</span></a>
+<ol class="ltx_toclist ltx_toclist_chapter">
+<li class="ltx_tocentry ltx_tocentry_section">
+<a href="#Ch5.S1" title="In Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.1 </span>Results</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch5.S1.SS1" title="In 5.1 Results ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.1.1 </span>Batch Processing of graphs</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch5.S1.SS2" title="In 5.1 Results ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.1.2 </span>Cost of Single Insert</span></a></li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_section">
+<a href="#Ch5.S2" title="In Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.2 </span>Discussion</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch5.S2.SS1" title="In 5.2 Discussion ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.2.1 </span>Modularity</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch5.S2.SS2" title="In 5.2 Discussion ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.2.2 </span>Graph Stability</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch5.S2.SS3" title="In 5.2 Discussion ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.2.3 </span>Domino Effect</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch5.S2.SS4" title="In 5.2 Discussion ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">5.2.4 </span>Usage in real-time systems</span></a></li>
+</ol>
+</li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_chapter">
+<a href="#Ch6" title="In Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6 </span>Conclusion &amp; Further Work</span></a>
+<ol class="ltx_toclist ltx_toclist_chapter">
+<li class="ltx_tocentry ltx_tocentry_section">
+<a href="#Ch6.S1" title="In Chapter 6 Conclusion &amp; Further Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.1 </span>Future Work</span></a>
+<ol class="ltx_toclist ltx_toclist_section">
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch6.S1.SS1" title="In 6.1 Future Work ‣ Chapter 6 Conclusion &amp; Further Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.1.1 </span>Differential Dataflow</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch6.S1.SS2" title="In 6.1 Future Work ‣ Chapter 6 Conclusion &amp; Further Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.1.2 </span>Differential Dataflow Operators</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch6.S1.SS3" title="In 6.1 Future Work ‣ Chapter 6 Conclusion &amp; Further Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.1.3 </span>Other Graph Clustering Methods</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch6.S1.SS4" title="In 6.1 Future Work ‣ Chapter 6 Conclusion &amp; Further Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.1.4 </span>Incremental Hierarchical clustering</span></a></li>
+<li class="ltx_tocentry ltx_tocentry_subsection"><a href="#Ch6.S1.SS5" title="In 6.1 Future Work ‣ Chapter 6 Conclusion &amp; Further Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.1.5 </span>Unifying “Self Adjusting Computations”</span></a></li>
+</ol>
+</li>
+<li class="ltx_tocentry ltx_tocentry_section"><a href="#Ch6.S2" title="In Chapter 6 Conclusion &amp; Further Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_title"><span class="ltx_tag ltx_tag_ref">6.2 </span>Conclusion</span></a></li>
+</ol>
+</li>
+</ol></nav>
+</section>
+<section id="Ch1" class="ltx_chapter">
+<h2 class="ltx_title ltx_title_chapter">
+<span class="ltx_tag ltx_tag_chapter">Chapter 1 </span>Introduction</h2>
+
+<section id="Ch1.S1" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">1.1 </span>Introduction</h3>
+
+<div id="Ch1.S1.p1" class="ltx_para">
+<p class="ltx_p">Real-time processing of large networks and determining their community structures has a wide variety of applications such as finding clusters in social media networks, optimising resource allocation in real time data processing tasks and more. The typical number of new network edges produced on social media platforms now count in the millions while the size of the graphs themselves can be much higher. This explosion in size of networks over the recent years mean that traditional non-incremental graph clustering algorithms cannot be run when new nodes or edges are added and still yield timely information, which is crucial in extremely dynamic social networks. While there exists a large body of research concerning graph partitioning algorithms, unfortunately there has been little research as to how these algorithms could be adopted or used in an online setting. Additionally, the handful of existing literature concerning real time graph partitioning mostly limits itself to using simple, inexpensive heuristics. Incremental computation through techniques such as Differential Dataflow <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib8" class="ltx_ref">19</a>]</cite> could allow for more advanced and computationally demanding algorithms such as the Louvain <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib38" class="ltx_ref">6</a>]</cite> modularity optimisation algorithm to be used in online settings.
+<br class="ltx_break"><span class="ltx_text ltx_font_bold">Contributions:</span> The main contributions of this paper are:</p>
+<ul id="Ch1.S1.I1" class="ltx_itemize">
+<li id="Ch1.S1.I1.i1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch1.S1.I1.i1.p1" class="ltx_para">
+<p class="ltx_p">Introduction of the viability of using the differential dataflow computational model for the purposes of graph processing.</p>
+</div>
+</li>
+<li id="Ch1.S1.I1.i2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch1.S1.I1.i2.p1" class="ltx_para">
+<p class="ltx_p">Demonstrate how incremental computation could be used to significantly speedup traditionally non-incremental algorithms that perform lots of unnecessary work such as the Louvain modularity optimisation algorithm.</p>
+</div>
+</li>
+<li id="Ch1.S1.I1.i3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch1.S1.I1.i3.p1" class="ltx_para">
+<p class="ltx_p">Demonstrate and explore the limitations of parallelising Louvain and provide potential mitigation strategies where appropriate.</p>
+</div>
+</li>
+</ul>
+</div>
+</section>
+<section id="Ch1.S2" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">1.2 </span>Problem Statement and notation</h3>
+
+<div id="Ch1.S2.p1" class="ltx_para">
+<p class="ltx_p">Let <math id="Ch1.S2.p1.m1" class="ltx_Math" alttext="G(V,E)" display="inline"><mrow><mi>G</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>V</mi><mo>,</mo><mi>E</mi><mo stretchy="false">)</mo></mrow></mrow></math> be a graph such that <math id="Ch1.S2.p1.m2" class="ltx_Math" alttext="V" display="inline"><mi>V</mi></math> represents the set of vertices and <math id="Ch1.S2.p1.m3" class="ltx_Math" alttext="E" display="inline"><mi>E</mi></math> represents the set of edges from one vertex to another. It is important to note that this graph is also undirected, while algorithms have been researched that apply modularity optimisation to directed graphs, we only concern ourselves with undirected graphs for the purposes of this paper. In this graph we allow for edges that connect a vertex to itself and we define this as a “self-loop”, however, multi-edges are prohibited and in the case where the dataset contains multi-edges, these must be first agglomerated into a single edge by simply adding the costs in each multi-edge.
+A <span class="ltx_text ltx_font_italic">community</span> within a graph represents a set of vertices (possibly empty) such that the edges of these vertices display strong density. In practice however, we only concern ourselves with partitioning the vertex set <math id="Ch1.S2.p1.m4" class="ltx_Math" alttext="V" display="inline"><mi>V</mi></math> into some number of <span class="ltx_text ltx_font_italic">disjoint</span> non-empty communities. We will use <math id="Ch1.S2.p1.m5" class="ltx_Math" alttext="C(i)" display="inline"><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>i</mi><mo stretchy="false">)</mo></mrow></mrow></math> as notation to indicate the community of a given vertex <math id="Ch1.S2.p1.m6" class="ltx_Math" alttext="i" display="inline"><mi>i</mi></math>.
+We will define the adjacency matrix that defines our graph through <math id="Ch1.S2.p1.m7" class="ltx_Math" alttext="A_{ij}" display="inline"><msub><mi>A</mi><mrow><mi>i</mi><mo>⁢</mo><mi>j</mi></mrow></msub></math>, that is <math id="Ch1.S2.p1.m8" class="ltx_Math" alttext="A_{ij}" display="inline"><msub><mi>A</mi><mrow><mi>i</mi><mo>⁢</mo><mi>j</mi></mrow></msub></math> represents the weight from vertex <math id="Ch1.S2.p1.m9" class="ltx_Math" alttext="i" display="inline"><mi>i</mi></math> to <math id="Ch1.S2.p1.m10" class="ltx_Math" alttext="j" display="inline"><mi>j</mi></math>. Let <math id="Ch1.S2.p1.m11" class="ltx_Math" alttext="k_{i}" display="inline"><msub><mi>k</mi><mi>i</mi></msub></math> denote the weighted degree of a given vertex <math id="Ch1.S2.p1.m12" class="ltx_Math" alttext="k_{i}" display="inline"><msub><mi>k</mi><mi>i</mi></msub></math>, that is <math id="Ch1.S2.p1.m13" class="ltx_Math" alttext="k_{i}=\sum_{j}A_{ij}" display="inline"><mrow><msub><mi>k</mi><mi>i</mi></msub><mo rspace="0.111em">=</mo><mrow><msub><mo>∑</mo><mi>j</mi></msub><msub><mi>A</mi><mrow><mi>i</mi><mo>⁢</mo><mi>j</mi></mrow></msub></mrow></mrow></math> and finally we define <math id="Ch1.S2.p1.m14" class="ltx_Math" alttext="m" display="inline"><mi>m</mi></math> to be the summation of all the edges present in the graph of interest, that is <math id="Ch1.S2.p1.m15" class="ltx_Math" alttext="m=\frac{1}{2}\sum_{ij}A_{ij}" display="inline"><mrow><mi>m</mi><mo>=</mo><mrow><mfrac><mn>1</mn><mn>2</mn></mfrac><mo>⁢</mo><mrow><msub><mo>∑</mo><mrow><mi>i</mi><mo>⁢</mo><mi>j</mi></mrow></msub><msub><mi>A</mi><mrow><mi>i</mi><mo>⁢</mo><mi>j</mi></mrow></msub></mrow></mrow></mrow></math>, note we half the weight as a result of the doubling of weights present when an undirected graph is represented as an adjacency matrix. Finally we can now define modularity as <math id="Ch1.S2.p1.m16" class="ltx_Math" alttext="Q=\frac{1}{2m}\sum_{i,j}\left[A_{ij}-\frac{k_{i}k_{j}}{2m}\right]\delta\left(C%
+(i),C(j)\right)" display="inline"><mrow><mi>Q</mi><mo>=</mo><mrow><mfrac><mn>1</mn><mrow><mn>2</mn><mo>⁢</mo><mi>m</mi></mrow></mfrac><mo>⁢</mo><mrow><msub><mo rspace="0em">∑</mo><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></msub><mrow><mrow><mo>[</mo><mrow><msub><mi>A</mi><mrow><mi>i</mi><mo>⁢</mo><mi>j</mi></mrow></msub><mo>−</mo><mfrac><mrow><msub><mi>k</mi><mi>i</mi></msub><mo>⁢</mo><msub><mi>k</mi><mi>j</mi></msub></mrow><mrow><mn>2</mn><mo>⁢</mo><mi>m</mi></mrow></mfrac></mrow><mo>]</mo></mrow><mo>⁢</mo><mi>δ</mi><mo>⁢</mo><mrow><mo>(</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>i</mi><mo stretchy="false">)</mo></mrow></mrow><mo>,</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>j</mi><mo stretchy="false">)</mo></mrow></mrow><mo>)</mo></mrow></mrow></mrow></mrow></mrow></math>. Note that the <math id="Ch1.S2.p1.m17" class="ltx_Math" alttext="\delta\left(u,v\right)" display="inline"><mrow><mi>δ</mi><mo>⁢</mo><mrow><mo>(</mo><mi>u</mi><mo>,</mo><mi>v</mi><mo>)</mo></mrow></mrow></math> is simply the Kronecker delta function.</p>
+</div>
+</section>
+<section id="Ch1.S3" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">1.3 </span>Motivation</h3>
+
+<section id="Ch1.S3.SS1" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">1.3.1 </span>Differential Dataflow</h4>
+
+<div id="Ch1.S3.SS1.p1" class="ltx_para">
+<p class="ltx_p">Differential Dataflow <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib8" class="ltx_ref">19</a>]</cite> is an incremental computational model that has shown promise in a variety of graph processing tasks. In their paper, they demonstrated that their computational model was able to solve graph algorithms such as PageRank, Strongly Connected Components with a significant increase in performance over a selection of baselines, the speedups ranged from 1.9x to 1899.6x. Given most greedy modularity optimisation methods require multiple iterations over non-changing, already calculated vertices, it therefore makes sense to warrant an investigation on how Differential Dataflow could be used to reduce the cost of these iterations, additionally when we consider a dynamically changing graph we note that the increase in possible community swaps do not immediately increase with respect to the number of vertices but rather with respect to the degree of the inserted edge, although a swap as a result of this insertion may result in a domino effect of changes later on still.</p>
+</div>
+<section id="Ch1.S3.SS1.SSSx1" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Timely Dataflow</h5>
+
+<div id="Ch1.S3.SS1.SSSx1.p1" class="ltx_para">
+<p class="ltx_p">The open source implementation of Differential Dataflow was also a critical advantage when developing with Differential Dataflow, it provided easy access for distributed processing of data or in our case graphs. This ease of access for distributed computations is provided by the underlying dataflow computation engine called ‘Timely Dataflow’ first introduced in Naiad <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib32" class="ltx_ref">20</a>]</cite> which states that they provide a framework for low-latency cyclic dataflow computations. This engine ensured that our implementation could run on a cluster, a process or multiple processes with relatively little configuration.</p>
+</div>
+</section>
+</section>
+<section id="Ch1.S3.SS2" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">1.3.2 </span>Louvain</h4>
+
+<div id="Ch1.S3.SS2.p1" class="ltx_para">
+<p class="ltx_p">One criteria for choosing Louvain modularity optimisation as a candidate for our exploration of incremental, data-parallel graph clustering was simply as a result of its usefulness and widespread use in both academia and in industry. Louvain despite its pitfalls has remained the most commonly used graph clustering algorithm with various open source implementations in distributed dataflow processing frameworks such as Apache Spark <span id="Ch1.footnote1" class="ltx_note ltx_role_footnote"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_tag ltx_tag_note">1</span>See <a href="https://spark.apache.org/" title="" class="ltx_ref ltx_url ltx_font_typewriter">https://spark.apache.org/</a></span></span></span>. The other criteria for choosing Louvain is simply due to the unnecessary work it performs when iterating over vertices, this provides a place of improvement in terms of performance, additionally as mentioned previously the advantages of incrementally performing Louvain may result in showing that the use of Louvain like methods used for agglomerative clustering could also be used in conjunction with Differential Dataflow.</p>
+</div>
+</section>
+</section>
+</section>
+<section id="Ch2" class="ltx_chapter">
+<h2 class="ltx_title ltx_title_chapter">
+<span class="ltx_tag ltx_tag_chapter">Chapter 2 </span>Background &amp; Related Work</h2>
+
+<section id="Ch2.S1" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2.1 </span>Graph Partitioning</h3>
+
+<div id="Ch2.S1.p1" class="ltx_para">
+<p class="ltx_p">The general problem of exact graph partitioning is known to be NP-complete <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib15" class="ltx_ref">10</a>]</cite>, as a result of this severe restriction, the large body of research mostly focuses on approximate solutions to this problem over exact solutions, perhaps the best known one being the Kernighan-Lin algorithm <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib18" class="ltx_ref">15</a>]</cite>. Most graph clustering algorithms are based upon a few key concepts such as heuristics <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib18" class="ltx_ref">15</a>]</cite>, agglomerative clustering <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib3" class="ltx_ref">22</a>, <a href="#bib.bib20" class="ltx_ref">7</a>]</cite> and divisive clustering <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib4" class="ltx_ref">21</a>]</cite> although other techniques such as spectral clustering, k-means clustering, do exist <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib5" class="ltx_ref">14</a>, <a href="#bib.bib21" class="ltx_ref">4</a>, <a href="#bib.bib23" class="ltx_ref">16</a>]</cite>. The full literature on graph clustering algorithms is extensive and cannot be expressed concisely, however, a large amount of these algorithms have been studied and summarized in various surveys and studies <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib6" class="ltx_ref">25</a>, <a href="#bib.bib22" class="ltx_ref">1</a>, <a href="#bib.bib24" class="ltx_ref">17</a>]</cite>. The specific area concerning real-time graph clustering algorithms mostly consists of simple, computationally inexpensive, heuristic based methods <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib25" class="ltx_ref">26</a>]</cite> as mentioned previously, although some exotic methods have also been presented <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib26" class="ltx_ref">28</a>]</cite>.</p>
+</div>
+</section>
+<section id="Ch2.S2" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2.2 </span>Incremental Computation</h3>
+
+<div id="Ch2.S2.p1" class="ltx_para">
+<p class="ltx_p">Incremental Computation has been an niche, unique field with relatively few published literature, most published research is based upon Umut Acar’s PhD thesis on "Self Adjusting Computations" <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib12" class="ltx_ref">2</a>]</cite>, later developments such as Adapton <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib10" class="ltx_ref">13</a>]</cite> build upon this work. The idea behind this class of incremental computation is somewhat simple. Adapton for example performs general purpose incremental computations through building a computation graph, whenever data in this computation graph is changed, the child nodes in this computation graph are “dirtied”, whenever the result of this computation graph is requested by the application, these “dirty” nodes are recomputed. The fundamental difference between Differential Dataflow and Adapton is that Adapton is a general purpose incremental computation framework while Differential Dataflow is optimised for writing dataflow programs and the open source implementation of Differential Dataflow is built on a distributed low latency, cyclic dataflow programming layer called ‘Timely Dataflow’ <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib32" class="ltx_ref">20</a>]</cite>.</p>
+</div>
+</section>
+<section id="Ch2.S3" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2.3 </span>Incremental View Maintenance</h3>
+
+<div id="Ch2.S3.p1" class="ltx_para">
+<p class="ltx_p">Incremental View Maintenance algorithms are of concern when discussing Differential Dataflow as they both aim to perform similar objectives. However, it should be noted that existing IVM techniques either perform too much work, maintain too much state or limit expressiveness. Take for consideration the classic incremental view maintainence algorithm by Gupta <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib30" class="ltx_ref">12</a>]</cite>, this algorithm has some execution such that it over-estimates the number of invalidated tuples and performs a large amount of work to correct this error. Consider Nigam’s work on the extended PSN algorithm <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib31" class="ltx_ref">23</a>]</cite>, this implementation stores tuples along with the full set of tuples used to derive it, this is obviously restrictive on large networks. If we take into account later developments such as DBToaster <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib9" class="ltx_ref">3</a>]</cite> that has spearheaded IVM algorithm research since 2009, it still suffers from the inability to perform IVM on iterative workloads.</p>
+</div>
+</section>
+<section id="Ch2.S4" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2.4 </span>Incremental Dataflow</h3>
+
+<div id="Ch2.S4.p1" class="ltx_para">
+<p class="ltx_p">While there have been several papers and software solutions to the problem of incrementally processing dataflow programs, they have been mostly simple modifications to existing dataflow systems. Incoop <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib14" class="ltx_ref">5</a>]</cite>, builds upon Acar’s previous work on "Self Adjusting Computations" <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib12" class="ltx_ref">2</a>]</cite> to bring incremental processing to the MapReduce paradigm, on closer inspection of Incoop, one would notice that the suggested system is not much more than a simple caching and reuse of values. There are plenty of obvious drawbacks when using such a system, such as the inability to process iterative algorithms and the inability to maintain low latency.</p>
+</div>
+</section>
+<section id="Ch2.S5" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2.5 </span>Iterative Dataflow</h3>
+
+<div id="Ch2.S5.p1" class="ltx_para">
+<p class="ltx_p">Various attempts have been made to enhance the MapReduce <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib13" class="ltx_ref">8</a>]</cite> paradigm to support iterative workloads. The core principle here is to repeatedly apply MapReduce until a defined stopping criteria is met. Apart from the fact that this modification can not deal with incremental workloads, the implementations of iterative MapReduce introduce additional problems regarding data consistency after node failures. Consider for example the instance of a node failure in a MapReduce system where an iterative workload is in the process of being computed, data consistency issues may arise if the nodes execute on data at different iteration points after the restoration of the failed node, these issues can be addressed but introduce additional system complexity and latency.</p>
+</div>
+</section>
+<section id="Ch2.S6" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2.6 </span>Modularity Optimisation</h3>
+
+<div id="Ch2.S6.p1" class="ltx_para">
+<p class="ltx_p">Modularity optimisation was initially proposed by Newman <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib4" class="ltx_ref">21</a>]</cite>, while algorithms like Louvain <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib38" class="ltx_ref">6</a>]</cite> exist to perform this task, it is important to note that exact modularity optimisation, like graph partitioning is NP-hard. It is because of this fundamental limitation that the algorithms that have been researched and presented in literature are only heuristic based methods that do not aim for optimal modularity optimisation but rather to simply get close to optimal results. Unfortunately, this reliance on a global metric for the computation of modularity is why parallel and dataflow implementations of modularity optimisations are hard to implement and why they suffer from convergence issues, deadlocks and negative gain scenarios.</p>
+</div>
+</section>
+<section id="Ch2.S7" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2.7 </span>The Louvain Algorithm</h3>
+
+<div id="Ch2.S7.p1" class="ltx_para">
+<p class="ltx_p">Louvain <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib38" class="ltx_ref">6</a>]</cite> is an agglomerative clustering algorithm based upon optimising modularity, the only objective of this algorithm is to optimise <math id="Ch2.S7.p1.m1" class="ltx_Math" alttext="Q=\frac{1}{2m}\sum_{i,j}\left[A_{ij}-\frac{k_{i}k_{j}}{2m}\right]\delta\left(c%
+_{i},c_{j}\right)" display="inline"><mrow><mi>Q</mi><mo>=</mo><mrow><mfrac><mn>1</mn><mrow><mn>2</mn><mo>⁢</mo><mi>m</mi></mrow></mfrac><mo>⁢</mo><mrow><msub><mo rspace="0em">∑</mo><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></msub><mrow><mrow><mo>[</mo><mrow><msub><mi>A</mi><mrow><mi>i</mi><mo>⁢</mo><mi>j</mi></mrow></msub><mo>−</mo><mfrac><mrow><msub><mi>k</mi><mi>i</mi></msub><mo>⁢</mo><msub><mi>k</mi><mi>j</mi></msub></mrow><mrow><mn>2</mn><mo>⁢</mo><mi>m</mi></mrow></mfrac></mrow><mo>]</mo></mrow><mo>⁢</mo><mi>δ</mi><mo>⁢</mo><mrow><mo>(</mo><msub><mi>c</mi><mi>i</mi></msub><mo>,</mo><msub><mi>c</mi><mi>j</mi></msub><mo>)</mo></mrow></mrow></mrow></mrow></mrow></math>. The algorithm is initiated through allocating each node into its own unique community, then two phases are performed in iteration until a fixed point is reached or a defined modularity threshold is not met. The first phase is to simply iterate over the nodes and calculate the gain in modularity by moving the node into the communities of its neighbours, this change in modularity can be calculated through the equation:</p>
+<table id="Ch2.Ex1" class="ltx_equation ltx_eqn_table">
+
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="Ch2.Ex1.m1" class="ltx_Math" alttext="\Delta Q=\left[\frac{\sum_{in}+k_{i,in}}{2m}-\left(\frac{\sum_{tot}+k_{i}}{2m}%
+\right)^{2}\right]-\left[\frac{\sum_{in}}{2m}-\left(\frac{\sum_{tot}}{2m}%
+\right)^{2}-\left(\frac{k_{i}}{2m}\right)^{2}\right]" display="block"><mrow><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><mi>Q</mi></mrow><mo>=</mo><mrow><mrow><mo>[</mo><mrow><mfrac><mrow><msub><mo>∑</mo><mrow><mi>i</mi><mo>⁢</mo><mi>n</mi></mrow></msub><mo lspace="0em">+</mo><msub><mi>k</mi><mrow><mi>i</mi><mo>,</mo><mrow><mi>i</mi><mo>⁢</mo><mi>n</mi></mrow></mrow></msub></mrow><mrow><mn>2</mn><mo>⁢</mo><mi>m</mi></mrow></mfrac><mo>−</mo><msup><mrow><mo>(</mo><mfrac><mrow><msub><mo>∑</mo><mrow><mi>t</mi><mo>⁢</mo><mi>o</mi><mo>⁢</mo><mi>t</mi></mrow></msub><mo lspace="0em">+</mo><msub><mi>k</mi><mi>i</mi></msub></mrow><mrow><mn>2</mn><mo>⁢</mo><mi>m</mi></mrow></mfrac><mo>)</mo></mrow><mn>2</mn></msup></mrow><mo>]</mo></mrow><mo>−</mo><mrow><mo>[</mo><mrow><mfrac><msub><mo>∑</mo><mrow><mi>i</mi><mo>⁢</mo><mi>n</mi></mrow></msub><mrow><mn>2</mn><mo>⁢</mo><mi>m</mi></mrow></mfrac><mo>−</mo><msup><mrow><mo>(</mo><mfrac><msub><mo>∑</mo><mrow><mi>t</mi><mo>⁢</mo><mi>o</mi><mo>⁢</mo><mi>t</mi></mrow></msub><mrow><mn>2</mn><mo>⁢</mo><mi>m</mi></mrow></mfrac><mo>)</mo></mrow><mn>2</mn></msup><mo>−</mo><msup><mrow><mo>(</mo><mfrac><msub><mi>k</mi><mi>i</mi></msub><mrow><mn>2</mn><mo>⁢</mo><mi>m</mi></mrow></mfrac><mo>)</mo></mrow><mn>2</mn></msup></mrow><mo>]</mo></mrow></mrow></mrow></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<p class="ltx_p">. After the completion of this evaluation for a given vertex <math id="Ch2.S7.p1.m2" class="ltx_Math" alttext="i" display="inline"><mi>i</mi></math>, a neighbour <math id="Ch2.S7.p1.m3" class="ltx_Math" alttext="j" display="inline"><mi>j</mi></math> is chosen such that it represents the maximum modularity gain by moving <math id="Ch2.S7.p1.m4" class="ltx_Math" alttext="i" display="inline"><mi>i</mi></math> into the communities of one of its neighbours, in the case where the modularity gain is zero, no community transfers take place. This step is repeated until a fixed point or a defined stopping criteria is met. It is important to note that Louvain does unfortunately evaluate modularity needlessly for certain nodes, contributing to a performance degradation. The second phase of this algorithm is to simply aggregate all nodes within the same community to a new node, as mentioned previously these two phases are repeated until a stopping criteria is met. It is important to note that Louvain <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib38" class="ltx_ref">6</a>]</cite> is able to offer significantly faster clustering with a runtime complexity of <math id="Ch2.S7.p1.m5" class="ltx_Math" alttext="\mathcal{O}(n*log(n))" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>n</mi><mo lspace="0.222em" rspace="0.222em">∗</mo><mi>l</mi></mrow><mo>⁢</mo><mi>o</mi><mo>⁢</mo><mi>g</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow></math>, this proved to be a clear advantage at the time where most algorithms were <math id="Ch2.S7.p1.m6" class="ltx_Math" alttext="\mathcal{O}(n^{p})" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><msup><mi>n</mi><mi>p</mi></msup><mo stretchy="false">)</mo></mrow></mrow></math> at least, where <math id="Ch2.S7.p1.m7" class="ltx_Math" alttext="p" display="inline"><mi>p</mi></math> was some integer greater than 1. The algorithm however is not without faults, unfortunately one disadvantage of using the above mentioned aggregation step is that it is greedy and only has a limited view into how nodes will be clustered globally and throughout the various iterations, as a result of this it may not yield optimal modularity for the clustered graph. To demonstrate one failing of Louvain, consider the case where it may be beneficial to move a node from a cluster to a newly formed cluster, unfortunately due to the aggregation step, this can never happen. Unfortunately, Louvain has no known upper bound for the number of iterations that have to be performed in order to obtain convergence, this is why simpler methods such as meeting a modularity threshold or even simply capping the number of iterations to some fixed integer is typically used.</p>
+</div>
+</section>
+<section id="Ch2.S8" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2.8 </span>Limits of modularity</h3>
+
+<div id="Ch2.S8.p1" class="ltx_para">
+<p class="ltx_p">It is important to note that optimisation of modularity is not a guarantee of the detection of community structures, this is further explored in <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib34" class="ltx_ref">9</a>]</cite>. It has been shown that there even exists large values of measures of modularity in completely random graphs <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib35" class="ltx_ref">11</a>, <a href="#bib.bib36" class="ltx_ref">24</a>]</cite>, this obviously presents a major limitation in evaluating the true community structure through measuring modularity alone. Fortunato notes that this is as a result of random fluctuations in the distribution of edges, he states that these fluctuations determine concentrations of links in subsets of the graph which then falsely may appear to be community structures. As a result of these findings regarding modularity measurement, we cannot definitively state if a measurement of modularity corresponds to some community structure, however Fortunato has determined that a z-score derived from random rewiring of the graph could be used to obtain some probabilistic measure of community detection. To make matters worse, Fortunato has noted a fundemental problem at the core of modularity optimisation techniques and that is the fact that modularity optimisation has a resolution limit. To be more precise, if the maximum modularity produces communities of size <math id="Ch2.S8.p1.m1" class="ltx_Math" alttext="\sqrt{m}" display="inline"><msqrt><mi>m</mi></msqrt></math> or smaller, one cannot know if that particular community is a single community or in fact made up of smaller weakly linked communities. While there have been some attempts to address this issue, our implementation exclusively looked at the modularity definition present in the Louvain method <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib38" class="ltx_ref">6</a>]</cite>, despite its inherent problems simply as a result of that definition of modularity being more commonly used.</p>
+</div>
+</section>
+</section>
+<section id="Ch3" class="ltx_chapter">
+<h2 class="ltx_title ltx_title_chapter">
+<span class="ltx_tag ltx_tag_chapter">Chapter 3 </span>Method</h2>
+
+<section id="Ch3.S1" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">3.1 </span>Parallel Louvain</h3>
+
+<div id="Ch3.S1.p1" class="ltx_para">
+<p class="ltx_p">There has been relatively little work on parallelising Louvain, largely because the algorithm is non trivial to parallelise. Louvain is non trivial to parallelise as a result of the constantly changing parameters used in modularity evaluation, the usage of a lock to safeguard these parameters degrade the algorithm into a potentially slower sequential algorithm. Eventually consistent parameters being used in modularity evaluation still caries the same problems as a parallel version relying on stale data, although to a reduced level. An important parallel enabling modification to Louvain is discussed by Lu in <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib27" class="ltx_ref">18</a>]</cite>, this implementation proves the problem of negative gain and addresses this concern in an effective manner. Importantly, it provides one easy step of parallelisation for us that does not cause negative gain and that is the vertex following heuristic they introduced. The work by Lu proved that not only were they able to obtain significant speedups over the serial algorithm, they were also able to produce communities with higher modularity.</p>
+</div>
+<section id="Ch3.S1.SS1" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.1.1 </span>Negative gain scenario</h4>
+
+<div id="Ch3.S1.SS1.p1" class="ltx_para">
+<p class="ltx_p">Although the Louvain modulairty algorithm always improves modularity in its serial implementation, this property is not maintained in parallel implementations. Unfortunately this means that it is possible for the parallel implementation to worsen the modularity of a graph and in this case steps must be made to prevent or mitigate this issue. This negative gain scenario present in Parallel Louvain is discussed and proven by Lu <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib27" class="ltx_ref">18</a>]</cite>.</p>
+</div>
+</section>
+</section>
+<section id="Ch3.S2" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">3.2 </span>Dataflow Louvain</h3>
+
+<div id="Ch3.S2.p1" class="ltx_para">
+<p class="ltx_p">As far as the author is aware, this is the only literature present that addresses how the Louvain modularity optimisation algorithm could be modified such that it is capable of running as a dataflow program. The potential pitfalls with parallelising Louvain modularity optimisation is present with an even greater effect when considering a dataflow implementation of the algorithm. This is ultimately due to a simple but obvious limitation of most dataflow programming, dataflow programming pulls in its data and it is unable to push and propagate changes immediately unlike a parallel implementation which could in the very least place a bound on the staleness of the data. This is an area of concern when considering any modularity optimisation algorithm since it requires changing data to update the various parameters used in determining modularity such as <math id="Ch3.S2.p1.m1" class="ltx_Math" alttext="k_{i}" display="inline"><msub><mi>k</mi><mi>i</mi></msub></math>, <math id="Ch3.S2.p1.m2" class="ltx_Math" alttext="\sum_{tot}" display="inline"><msub><mo>∑</mo><mrow><mi>t</mi><mo>⁢</mo><mi>o</mi><mo>⁢</mo><mi>t</mi></mrow></msub></math> and other variables, this is as a result of these algorithms optimising for a global metric (<math id="Ch3.S2.p1.m3" class="ltx_Math" alttext="Q" display="inline"><mi>Q</mi></math>), a better solution to parallelise graph clustering is to obtain some local metric to optimise, unfortunately, to the authors knowledge, no such method exists in published literature.</p>
+</div>
+<section id="Ch3.S2.SS1" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.2.1 </span>Non-termination</h4>
+
+<div id="Ch3.S2.SS1.p1" class="ltx_para">
+<p class="ltx_p">Unfortunately as a result of our computations being performed on stale data, it is possible to end up in a deadlock. This case is trivial to demonstrate, consider the simple case where there exists a graph of size two. Let’s state that when performing the version of Louvain without updates and relying on stale data there is a <math id="Ch3.S2.SS1.p1.m1" class="ltx_Math" alttext="\Delta{Q}&gt;0" display="inline"><mrow><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><mi>Q</mi></mrow><mo>&gt;</mo><mn>0</mn></mrow></math> at both vertices, this means that both will perform a move to each others community. Following this move, it becomes clear that the next step could also simply be to repeat this swap, this means that some method is needed to prevent non-termination.</p>
+</div>
+</section>
+<section id="Ch3.S2.SS2" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.2.2 </span>Counterfactual swapping</h4>
+
+<div id="Ch3.S2.SS2.p1" class="ltx_para">
+<p class="ltx_p">Given our usage of differential dataflow, we are able to mitigate some non-termination behaviour relatively cheaply. When we are about to make a decision to move to another community, we do this by examining the modularity gain of moving to the vertex of one of our edges. We can simply perform a join to determine where our neighbour would move, but more importantly we are then also able to evaluate the modularity gain for both of these operations and only perform the community transfer which maximises global modularity. While this may seem counter-intuitive since we limit the community transfers made, it mitigates both non-termination negative gain scenarios to a certain extent, unfortunately it does not however prevent non-termination nor negative-gain.
+The swapping technique above does not prevent non-termination. It is able to mitigate non-termination when considering two vertices however, when the number of vertices that perform cyclic swaps increase, it is obviously unable to account for such a scenario. Consider the case of a set of vertices where each vertex moves in a circular repeating pattern between communities, lets label these vertices as <math id="Ch3.S2.SS2.p1.m1" class="ltx_Math" alttext="i,j,k" display="inline"><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>k</mi></mrow></math> such that <math id="Ch3.S2.SS2.p1.m2" class="ltx_Math" alttext="i\in C(j),j\in C(j),k\in C(k)" display="inline"><mrow><mrow><mi>i</mi><mo>∈</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>j</mi><mo stretchy="false">)</mo></mrow></mrow></mrow><mo>,</mo><mrow><mrow><mi>j</mi><mo>∈</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>j</mi><mo stretchy="false">)</mo></mrow></mrow></mrow><mo>,</mo><mrow><mi>k</mi><mo>∈</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>k</mi><mo stretchy="false">)</mo></mrow></mrow></mrow></mrow></mrow></math> and <math id="Ch3.S2.SS2.p1.m3" class="ltx_Math" alttext="C(i)\neq C(j)\neq C(k)" display="inline"><mrow><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>i</mi><mo stretchy="false">)</mo></mrow></mrow><mo>≠</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>j</mi><mo stretchy="false">)</mo></mrow></mrow><mo>≠</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>k</mi><mo stretchy="false">)</mo></mrow></mrow></mrow></math>. Consider the case where <math id="Ch3.S2.SS2.p1.m4" class="ltx_Math" alttext="i" display="inline"><mi>i</mi></math> considers moving to <math id="Ch3.S2.SS2.p1.m5" class="ltx_Math" alttext="C(j)" display="inline"><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>j</mi><mo stretchy="false">)</mo></mrow></mrow></math>, <math id="Ch3.S2.SS2.p1.m6" class="ltx_Math" alttext="j" display="inline"><mi>j</mi></math> considers moving to <math id="Ch3.S2.SS2.p1.m7" class="ltx_Math" alttext="C(k)" display="inline"><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>k</mi><mo stretchy="false">)</mo></mrow></mrow></math> and <math id="Ch3.S2.SS2.p1.m8" class="ltx_Math" alttext="k" display="inline"><mi>k</mi></math> considers moving to <math id="Ch3.S2.SS2.p1.m9" class="ltx_Math" alttext="C(i)" display="inline"><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>i</mi><mo stretchy="false">)</mo></mrow></mrow></math> simultaneously. In this case these vertices will see the global modularity as being <math id="Ch3.S2.SS2.p1.m10" class="ltx_Math" alttext="Q_{new_{i}}=Q_{old}+\Delta{Q_{i\rightarrow C(j)}}" display="inline"><mrow><msub><mi>Q</mi><mrow><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>w</mi><mi>i</mi></msub></mrow></msub><mo>=</mo><mrow><msub><mi>Q</mi><mrow><mi>o</mi><mo>⁢</mo><mi>l</mi><mo>⁢</mo><mi>d</mi></mrow></msub><mo>+</mo><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><msub><mi>Q</mi><mrow><mi>i</mi><mo stretchy="false">→</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>j</mi><mo stretchy="false">)</mo></mrow></mrow></mrow></msub></mrow></mrow></mrow></math>, <math id="Ch3.S2.SS2.p1.m11" class="ltx_Math" alttext="Q_{new_{j}}=Q_{old}+\Delta_{Q_{j\rightarrow C(k)}}" display="inline"><mrow><msub><mi>Q</mi><mrow><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>w</mi><mi>j</mi></msub></mrow></msub><mo>=</mo><mrow><msub><mi>Q</mi><mrow><mi>o</mi><mo>⁢</mo><mi>l</mi><mo>⁢</mo><mi>d</mi></mrow></msub><mo>+</mo><msub><mi mathvariant="normal">Δ</mi><msub><mi>Q</mi><mrow><mi>j</mi><mo stretchy="false">→</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>k</mi><mo stretchy="false">)</mo></mrow></mrow></mrow></msub></msub></mrow></mrow></math> and <math id="Ch3.S2.SS2.p1.m12" class="ltx_Math" alttext="Q_{new_{k}}=Q_{old}+\Delta{Q_{k\rightarrow C(i)}}" display="inline"><mrow><msub><mi>Q</mi><mrow><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><msub><mi>w</mi><mi>k</mi></msub></mrow></msub><mo>=</mo><mrow><msub><mi>Q</mi><mrow><mi>o</mi><mo>⁢</mo><mi>l</mi><mo>⁢</mo><mi>d</mi></mrow></msub><mo>+</mo><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><msub><mi>Q</mi><mrow><mi>k</mi><mo stretchy="false">→</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>i</mi><mo stretchy="false">)</mo></mrow></mrow></mrow></msub></mrow></mrow></mrow></math> respectively. The critical error here is obvious, these new values of <math id="Ch3.S2.SS2.p1.m13" class="ltx_Math" alttext="Q" display="inline"><mi>Q</mi></math> are completely wrong and could potentially lead to non-termination, the real value of <math id="Ch3.S2.SS2.p1.m14" class="ltx_Math" alttext="Q" display="inline"><mi>Q</mi></math> is in fact given by <math id="Ch3.S2.SS2.p1.m15" class="ltx_Math" alttext="Q_{new}=Q_{old}+\Delta{Q_{i\rightarrow C(j)}}+\Delta{Q_{j\rightarrow C(k)}}+%
+\Delta{Q_{k\rightarrow C(i)}}" display="inline"><mrow><msub><mi>Q</mi><mrow><mi>n</mi><mo>⁢</mo><mi>e</mi><mo>⁢</mo><mi>w</mi></mrow></msub><mo>=</mo><mrow><msub><mi>Q</mi><mrow><mi>o</mi><mo>⁢</mo><mi>l</mi><mo>⁢</mo><mi>d</mi></mrow></msub><mo>+</mo><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><msub><mi>Q</mi><mrow><mi>i</mi><mo stretchy="false">→</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>j</mi><mo stretchy="false">)</mo></mrow></mrow></mrow></msub></mrow><mo>+</mo><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><msub><mi>Q</mi><mrow><mi>j</mi><mo stretchy="false">→</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>k</mi><mo stretchy="false">)</mo></mrow></mrow></mrow></msub></mrow><mo>+</mo><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><msub><mi>Q</mi><mrow><mi>k</mi><mo stretchy="false">→</mo><mrow><mi>C</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>i</mi><mo stretchy="false">)</mo></mrow></mrow></mrow></msub></mrow></mrow></mrow></math>. Note how in the above formula a determination of one transfer directly impacts the values used in the computation of <math id="Ch3.S2.SS2.p1.m16" class="ltx_Math" alttext="\Delta{Q}" display="inline"><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><mi>Q</mi></mrow></math> in other transfers, this is why Louvain is traditionally a sequential algorithm.</p>
+</div>
+</section>
+<section id="Ch3.S2.SS3" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.2.3 </span>Recognising where deadlocks (non-termination) may occur</h4>
+
+<div id="Ch3.S2.SS3.p1" class="ltx_para">
+<p class="ltx_p">Ultimately deadlocks occur when vertices continuously move around its neighbours and are also able to move back to their initial community structure, following this revelation it becomes easy to recognise that this implies that deadlocks occur in connected components although further work should be attempted to prove if this is exactly the case. A simple yet naive approach to this problem could be to simply agglomerate connected components into a single structure, however this is not always a viable approach as there exists graphs with the number of nodes in communities being smaller than the number of nodes in connected components, as a result using this approach would simply break our community detection algorithm for some graphs. As a result of our graph dataset containing graphs such that the size of one of its strongly connected components was the same size of the graph itself, this was obviously not a practical option.</p>
+</div>
+</section>
+<section id="Ch3.S2.SS4" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.2.4 </span>Implementation</h4>
+
+<div id="Ch3.S2.SS4.p1" class="ltx_para">
+<p class="ltx_p">Ultimately, our method is not dissimilar to the traditional Louvain <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib38" class="ltx_ref">6</a>]</cite> algorithm for modularity optimisation. The algorithm is expressed as a dataflow program, however the equation to measure both modularity and modularity gain remains the same as the traditional algorithm. One fundamental restriction that had to be made in our implementation however, is to order our nodes, this was quite simply achieved by assigning an integer to every node, this is ultimately due to implementation details of the open source library that was used to implement our algorithm. Like the initial Louvain algorithm, this modification is able to scale up to networks that measure in the millions of edges and is only limited by the memory it consumed. It is important to note that Differential Dataflow implements logic simply by running it until the output data converges to a fixed point. Our algorithm only computes the first phase and the Louvain algorithm is applied repeatedly until a fixed point is reached, modifications such as custom stopping criteria can still be made through simply applying the identity function to the various mappings to force convergence even when the stopping criteria is probabilistic. The algorithm works by first assigning a unique community to every node in the graph, that is, the number of nodes and communities are equal at the start of the first iteration. For each node <math id="Ch3.S2.SS4.p1.m1" class="ltx_Math" alttext="i" display="inline"><mi>i</mi></math> in the graph, we consider the neighbours <math id="Ch3.S2.SS4.p1.m2" class="ltx_Math" alttext="j" display="inline"><mi>j</mi></math> of <math id="Ch3.S2.SS4.p1.m3" class="ltx_Math" alttext="i" display="inline"><mi>i</mi></math> and obtain the modularity gain (<math id="Ch3.S2.SS4.p1.m4" class="ltx_Math" alttext="\Delta Q" display="inline"><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><mi>Q</mi></mrow></math>) of moving it from its community and to the community of its neighbour, when performing this we need to keep track of the highest gain in modularity. After we have determined the highest gain in modularity, we perform the act of moving the node over to its neighbours community if <math id="Ch3.S2.SS4.p1.m5" class="ltx_Math" alttext="\Delta Q&gt;0" display="inline"><mrow><mrow><mi mathvariant="normal">Δ</mi><mo>⁢</mo><mi>Q</mi></mrow><mo>&gt;</mo><mn>0</mn></mrow></math>, otherwise the node remains in its current community.</p>
+</div>
+<section id="Ch3.S2.SS4.SSSx1" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Justification for not providing agglomeration</h5>
+
+<div id="Ch3.S2.SS4.SSSx1.p1" class="ltx_para">
+<p class="ltx_p">As noted previously, we do not perform any agglomeration in our Louvain based method, the reasoning for this is simple, it does not make sense to agglomerate the clusters when using Louvain in a stream-like context. In addition to this, new nodes being added will not carry enough weight to form communities of their own and will simply join existing communities if they have already been agglomerated heavily, this would break our community detection capabilities. We have briefly touched on how agglomerative clustering could be provided in <a href="#Ch6.S1.SS4" title="6.1.4 Incremental Hierarchical clustering ‣ 6.1 Future Work ‣ Chapter 6 Conclusion &amp; Further Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">section</span> <span class="ltx_text ltx_ref_tag">6.1.4</span></a>.</p>
+</div>
+</section>
+</section>
+<section id="Ch3.S2.SS5" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.2.5 </span>Challenges</h4>
+
+<section id="Ch3.S2.SS5.SSSx1" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Rust</h5>
+
+<div id="Ch3.S2.SS5.SSSx1.p1" class="ltx_para">
+<p class="ltx_p">Rust as a language proved to be a challenge when writing our implementation of the Differential Dataflow based Louvain method, this boiled down to the natural complexity that arose from dealing with the borrow checker that enforced affine types in a distributed/parallel setting with shared memory. In order to comply with the borrow checker, unfortunately, extra work was performed, however we used the properties of Differential Dataflow to our advantage here to keep these costs negligible after the initial computation was performed.</p>
+</div>
+</section>
+<section id="Ch3.S2.SS5.SSSx2" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Differential Dataflow</h5>
+
+<div id="Ch3.S2.SS5.SSSx2.p1" class="ltx_para">
+<p class="ltx_p">Unfortunately, the Rust implementation of Differential Dataflow is still quite undocumented and can be significantly difficult to understand due to the various mathematical abstractions it presents. This complexity contributed towards the difficulty regarding the evaluation of the performance characteristics of an algorithm of interest, while certain operations could be bounded by some algorithmic complexity in the worst case, at least theoretically, there was no realistically accessible method to evaluate the bounds of some such algorithm. In addition to these issues, there was missing documentation regarding the availability of some critical functionality such as the ‘explode’ operator. This operator is crucial for high performance Differential Dataflow code as it typically can be used to replace the computationally expensive ‘reduce’ operator. To understand how expensive the ‘reduce’ operator is, we must first note that the reductions are performed in non-differential (ordinary) rust, resulting on two critical drawbacks, we are unable to incremental compute and our parallelism is limited artificially to the number of keys. While this statement is true, it is important to note that the ‘explode’ operator is not as expressive as the ‘reduce’ operator and for some logic such as reduction based on sorted values the ‘explode’ operator simply is not applicable.</p>
+</div>
+</section>
+</section>
+<section id="Ch3.S2.SS6" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.2.6 </span>Limitations</h4>
+
+<div id="Ch3.S2.SS6.p1" class="ltx_para">
+<p class="ltx_p">Unfortunately as we have mentioned previously, there is no guarantee on convergence of our Louvain based method, in order to artificially induce convergence, we opted for a quick and easy method and that was to simply apply the identity function to a set of node, community pairs in the place where we would normally apply the clustering function. This is provides us with easy termination behaviour.</p>
+</div>
+</section>
+</section>
+</section>
+<section id="Ch4" class="ltx_chapter">
+<h2 class="ltx_title ltx_title_chapter">
+<span class="ltx_tag ltx_tag_chapter">Chapter 4 </span>Experiments</h2>
+
+<section id="Ch4.S1" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">4.1 </span>Experiment setup</h3>
+
+<div id="Ch4.S1.p1" class="ltx_para">
+<p class="ltx_p">There were multiple implementations of Louvain used in determining the effectiveness of the developed dataflow based Louvain algorithm. The first implementation was through Apache Spark, this implementation was based on an open source implementation of Louvain provided on Github with some modifications made to accommodate fair testing, as a result of us removing the agglomerative step in our Differential Dataflow implementation we did the same in the Apache Spark version.</p>
+</div>
+<section id="Ch4.S1.SS1" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.1.1 </span>Justification of Apache Spark based Louvain method for baseline</h4>
+
+<div id="Ch4.S1.SS1.p1" class="ltx_para">
+<p class="ltx_p">To our knowledge, there is no other method of combining incremental and iterative computations to dataflow computations with the exception of Differential Dataflow. Apache Spark and the Pregel based abstraction layer exposed via GraphX, isn’t completely at a disadvantage here however, since GraphX does provide incremental view maintenance capability along with other optimisations listed below in <a href="#Ch4.S1.SS2" title="4.1.2 Disadvantages impacting Differential Dataflow ‣ 4.1 Experiment setup ‣ Chapter 4 Experiments ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">section</span> <span class="ltx_text ltx_ref_tag">4.1.2</span></a>.</p>
+</div>
+</section>
+<section id="Ch4.S1.SS2" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.1.2 </span>Disadvantages impacting Differential Dataflow</h4>
+
+<div id="Ch4.S1.SS2.p1" class="ltx_para">
+<p class="ltx_p">Unfortunately, differential dataflow does not have an advantage in some tasks of dataflow computations, largely as a result of the of features present in Spark that Differential Dataflow lacks, at the end of the day, it is important to note that Differential Dataflow is an academia oriented library/framework where Apache Spark has been improved on over several years with major companies in industry using it for their ‘big-data’ processing needs. The lack of these features unfortunately negatively impacts the performance of Differential Dataflow, these potential areas of improvement for Differential Dataflow should be taken into account when comparing results. The list of features available in Apache Spark’s GraphX abstraction are listed below for the purposes of providing more perspective:</p>
+<ul id="Ch4.S1.I1" class="ltx_itemize">
+<li id="Ch4.S1.I1.i1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I1.i1.p1" class="ltx_para">
+<p class="ltx_p">Index Reuse</p>
+</div>
+</li>
+<li id="Ch4.S1.I1.i2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I1.i2.p1" class="ltx_para">
+<p class="ltx_p">Vertex Mirroring</p>
+</div>
+</li>
+<li id="Ch4.S1.I1.i3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I1.i3.p1" class="ltx_para">
+<p class="ltx_p">Multicast join</p>
+</div>
+</li>
+<li id="Ch4.S1.I1.i4" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I1.i4.p1" class="ltx_para">
+<p class="ltx_p">Partial Materialisation</p>
+</div>
+</li>
+<li id="Ch4.S1.I1.i5" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I1.i5.p1" class="ltx_para">
+<p class="ltx_p">Incremental View Maintenance</p>
+</div>
+</li>
+<li id="Ch4.S1.I1.i6" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I1.i6.p1" class="ltx_para">
+<p class="ltx_p">Automatic Join Elimination</p>
+</div>
+</li>
+<li id="Ch4.S1.I1.i7" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I1.i7.p1" class="ltx_para">
+<p class="ltx_p">Variable Integer Encoding</p>
+</div>
+</li>
+</ul>
+<p class="ltx_p">More such optimisations and details regarding what these optimisation enable in GraphX are presented in extensive detail in <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib33" class="ltx_ref">27</a>]</cite>. Note that some of the above optimisations will not necessarily improve performance with Differential Dataflow, for example the Incremental View Maintenance optimisation in GraphX.</p>
+</div>
+</section>
+<section id="Ch4.S1.SS3" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.1.3 </span>Testing Environment</h4>
+
+<section id="Ch4.S1.SS3.SSSx1" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Testing Environment - Rust</h5>
+
+<div id="Ch4.S1.SS3.SSSx1.p1" class="ltx_para">
+<ul id="Ch4.S1.I2" class="ltx_itemize">
+<li id="Ch4.S1.I2.i1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I2.i1.p1" class="ltx_para">
+<p class="ltx_p">CPU - AMD Ryzen™ 7 3700X @ 3.6-4.4GHz</p>
+</div>
+</li>
+<li id="Ch4.S1.I2.i2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I2.i2.p1" class="ltx_para">
+<p class="ltx_p">#CPUs - 8</p>
+</div>
+</li>
+<li id="Ch4.S1.I2.i3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I2.i3.p1" class="ltx_para">
+<p class="ltx_p">Memory - 32GB DDR4</p>
+</div>
+</li>
+<li id="Ch4.S1.I2.i4" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I2.i4.p1" class="ltx_para">
+<p class="ltx_p">Disk - Samsung 970 EVO Plus NVMe M.2 SSD</p>
+</div>
+</li>
+<li id="Ch4.S1.I2.i5" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I2.i5.p1" class="ltx_para">
+<p class="ltx_p">Compiler - Rust 1.57.0-nightly</p>
+</div>
+</li>
+</ul>
+</div>
+</section>
+<section id="Ch4.S1.SS3.SSSx2" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Testing Environment - Spark</h5>
+
+<div id="Ch4.S1.SS3.SSSx2.p1" class="ltx_para">
+<ul id="Ch4.S1.I3" class="ltx_itemize">
+<li id="Ch4.S1.I3.i1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I3.i1.p1" class="ltx_para">
+<p class="ltx_p">CPU - AMD Ryzen™ 7 3700X @ 3.6-4.4GHz</p>
+</div>
+</li>
+<li id="Ch4.S1.I3.i2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I3.i2.p1" class="ltx_para">
+<p class="ltx_p">#CPUs - 8</p>
+</div>
+</li>
+<li id="Ch4.S1.I3.i3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I3.i3.p1" class="ltx_para">
+<p class="ltx_p">Memory - 32GB DDR4</p>
+</div>
+</li>
+<li id="Ch4.S1.I3.i4" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I3.i4.p1" class="ltx_para">
+<p class="ltx_p">Disk - Samsung 970 EVO Plus NVMe M.2 SSD</p>
+</div>
+</li>
+<li id="Ch4.S1.I3.i5" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I3.i5.p1" class="ltx_para">
+<p class="ltx_p">Scala - 2.12.0</p>
+</div>
+</li>
+<li id="Ch4.S1.I3.i6" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I3.i6.p1" class="ltx_para">
+<p class="ltx_p">Spark - 3.0.2</p>
+</div>
+</li>
+<li id="Ch4.S1.I3.i7" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="Ch4.S1.I3.i7.p1" class="ltx_para">
+<p class="ltx_p">Java - Amazon Corretto 1.8.0_320</p>
+</div>
+</li>
+</ul>
+</div>
+</section>
+</section>
+<section id="Ch4.S1.SS4" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.1.4 </span>Datasets</h4>
+
+<div id="Ch4.S1.SS4.p1" class="ltx_para">
+<p class="ltx_p">The datasets were obtained from the set of graph databases available from the Stanford large graph database collection <span id="Ch4.footnote1" class="ltx_note ltx_role_footnote"><sup class="ltx_note_mark">1</sup><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_tag ltx_tag_note">1</span>See <a href="https://snap.stanford.edu/data/" title="" class="ltx_ref ltx_url ltx_font_typewriter">https://snap.stanford.edu/data/</a></span></span></span>. These graphs varied in size and included fairly large datasets such as the Amazon product co-purchasing dataset.</p>
+</div>
+<figure id="Ch4.T1" class="ltx_table">
+<div class="ltx_inline-block ltx_align_center ltx_transformed_outer" style="width:433.6pt;height:142.4pt;vertical-align:-0.0pt;"><span class="ltx_transformed_inner" style="transform:translate(-2.5pt,0.8pt) scale(0.988681506568127,0.988681506568127) ;">
+<table class="ltx_tabular ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_ll ltx_border_r ltx_border_t">Dataset</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Nodes</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Edges</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Average clustering coefficient</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_rr ltx_border_t">Nodes in largest SCC</th>
+</tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">AS-733</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">6474</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">13895</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.2522</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">6474</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Amazon</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">334863</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">925872</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.3967</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">334863</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">email-Eu-core</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">1005</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">25571</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.3994</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">803</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Crocodile</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">11631</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">170918</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">UNSPECIFIED</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">UNSPECIFIED</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Chameleon</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">2277</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">31421</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">UNSPECIFIED</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">UNSPECIFIED</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Squirrel</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">5201</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">198493</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">UNSPECIFIED</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">UNSPECIFIED</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_ll ltx_border_r ltx_border_t">Malaria-HVR_3</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">36</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">418</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">UNSPECIFIED</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_rr ltx_border_t">UNSPECIFIED</td>
+</tr>
+</tbody>
+</table>
+</span></div>
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_table">Table 4.1: </span>Dataset characteristics used in experiments</figcaption>
+</figure>
+</section>
+<section id="Ch4.S1.SS5" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.1.5 </span>Experimental Process</h4>
+
+<div id="Ch4.S1.SS5.p1" class="ltx_para">
+<p class="ltx_p">For both processes we used the maximum number of cores available (8). Although we did test on different number of cores, these did not reveal much insight and therefore were not explored in our results.</p>
+</div>
+<section id="Ch4.S1.SS5.SSSx1" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Batch Processing</h5>
+
+<div id="Ch4.S1.SS5.SSSx1.p1" class="ltx_para">
+<p class="ltx_p">In order to investigate the feasibility of a Differential Dataflow based Louvain method in the context of large batch processing jobs using the map reduce paradigm, we investigated how long it would take a Differential Dataflow based Louvain method to reach some modularity when compared to the previously mentioned Apache Spark based version.</p>
+</div>
+</section>
+<section id="Ch4.S1.SS5.SSSx2" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Incremental Processing</h5>
+
+<div id="Ch4.S1.SS5.SSSx2.p1" class="ltx_para">
+<p class="ltx_p">In this stage we only consider Differential Dataflow, since GraphX is not capable of providing us with an incremental computational model. The test here is quite simple, we run one single iteration of the Louvain clustering algorithm on some graph and measure the time it takes to compute a modularity for that particular graph, then we perform a single edge insertion and we measure its computation time as well. We define the time to compute the entire graph as the ‘single iteration batch processing time’ while we define the incremental computation time as the ‘incremental adjustment time’.</p>
+</div>
+</section>
+</section>
+</section>
+</section>
+<section id="Ch5" class="ltx_chapter">
+<h2 class="ltx_title ltx_title_chapter">
+<span class="ltx_tag ltx_tag_chapter">Chapter 5 </span>Results &amp; Discussion</h2>
+
+<section id="Ch5.S1" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">5.1 </span>Results</h3>
+
+<section id="Ch5.S1.SS1" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">5.1.1 </span>Batch Processing of graphs</h4>
+
+<div id="Ch5.S1.SS1.p1" class="ltx_para">
+<p class="ltx_p">Here we explore the different results obtained for batch processing of graph data using Apache Spark and Differential Dataflow.</p>
+</div>
+<section id="Ch5.S1.SS1.SSSx1" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Apache Spark</h5>
+
+<figure id="Ch5.T1" class="ltx_table">
+<div class="ltx_inline-block ltx_align_center ltx_transformed_outer" style="width:433.6pt;height:209pt;vertical-align:-0.0pt;"><span class="ltx_transformed_inner" style="transform:translate(67.4pt,-32.5pt) scale(1.45144464294023,1.45144464294023) ;">
+<table class="ltx_tabular ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_ll ltx_border_r ltx_border_t">Dataset</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Nodes</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Edges</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Time</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_rr ltx_border_t">Modularity</th>
+</tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">AS-733</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">6474</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">13895</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">18.331s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.478</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Amazon</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">334863</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">925872</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">49.869s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.621</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">email-Eu-core</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">1005</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">12.655s</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">12.656s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.412</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Crocodile</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">11631</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">170918</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">37.470s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.657</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Chameleon</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">2277</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">31421</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">13.582s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.663</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Squirrel</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">5201</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">198493</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">26.122s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.397</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_ll ltx_border_r ltx_border_t">Malaria-HVR_3</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">36</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">418</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">1.137s</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_rr ltx_border_t">0.0713</td>
+</tr>
+</tbody>
+</table>
+</span></div>
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_table">Table 5.1: </span>Results from batch processing of the various datasets using Apache Spark</figcaption>
+</figure>
+</section>
+<section id="Ch5.S1.SS1.SSSx2" class="ltx_subsubsection">
+<h5 class="ltx_title ltx_title_subsubsection">Differential Dataflow</h5>
+
+<figure id="Ch5.T2" class="ltx_table">
+<div class="ltx_inline-block ltx_align_center ltx_transformed_outer" style="width:433.6pt;height:203.4pt;vertical-align:-0.0pt;"><span class="ltx_transformed_inner" style="transform:translate(63.3pt,-29.7pt) scale(1.41231213548788,1.41231213548788) ;">
+<table class="ltx_tabular ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_ll ltx_border_r ltx_border_t">Dataset</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Nodes</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Edges</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Time</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_rr ltx_border_t">Modularity</th>
+</tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">AS-733</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">6474</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">13895</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.367s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.786</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Amazon</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">334863</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">925872</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">16.230s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.421</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">email-Eu-core</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">1005</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">25571</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.378s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.727</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Crocodile</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">11631</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">170918</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">2.624s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.619</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Chameleon</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">2277</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">31421</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">2.051s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.675</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Squirrel</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">5201</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">198493</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">2.220s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.621</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_ll ltx_border_r ltx_border_t">Malaria-HVR_3</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">36</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">418</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">0.001076s</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_rr ltx_border_t">0.986</td>
+</tr>
+</tbody>
+</table>
+</span></div>
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_table">Table 5.2: </span>Results from batch processing of the various datasets using Differential Dataflow</figcaption>
+</figure>
+</section>
+</section>
+<section id="Ch5.S1.SS2" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">5.1.2 </span>Cost of Single Insert</h4>
+
+<div id="Ch5.S1.SS2.p1" class="ltx_para">
+<p class="ltx_p">We now would like to measure the cost of a single insert in an already clustered graph, we can simply measure this through evaluating the time taken for a computation to stabilise after an edge pair is inserted to an already clustered graph (to a single iteration). The given table shows the performance for the initial graph clustering and also the cost of a single insertion.</p>
+</div>
+<figure id="Ch5.T3" class="ltx_table">
+<div class="ltx_inline-block ltx_align_center ltx_transformed_outer" style="width:433.6pt;height:121.4pt;vertical-align:-0.0pt;"><span class="ltx_transformed_inner" style="transform:translate(-40.4pt,11.3pt) scale(0.84293377064204,0.84293377064204) ;">
+<table class="ltx_tabular ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_ll ltx_border_r ltx_border_t">Dataset</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Nodes</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Edges</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">Single Iteration Batch Processing time</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_rr ltx_border_t">Incremental Adjustment time</th>
+</tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">AS-733</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">6474</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">13895</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.0027s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.0019s</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Amazon</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">334863</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">925872</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">1.143s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.778s</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">email-Eu-core</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">1005</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">25571</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.0023s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.000986s</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Crocodile</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">11631</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">170918</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.163s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.093s</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Chameleon</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">2277</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">31421</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.035s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.019s</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_ll ltx_border_r ltx_border_t">Wikipedia-Squirrel</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">5201</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">198493</td>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">0.196s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">0.092s</td>
+</tr>
+<tr class="ltx_tr">
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_ll ltx_border_r ltx_border_t">Malaria-HVR_3</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">36</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">418</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">0.001052s</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_rr ltx_border_t">0.0001747s</td>
+</tr>
+</tbody>
+</table>
+</span></div>
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_table">Table 5.3: </span>Result from single edge insertion with Differential Dataflow</figcaption>
+</figure>
+</section>
+</section>
+<section id="Ch5.S2" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">5.2 </span>Discussion</h3>
+
+<div id="Ch5.S2.p1" class="ltx_para">
+<p class="ltx_p">As shown in <a href="#Ch5.T1" title="In Apache Spark ‣ 5.1.1 Batch Processing of graphs ‣ 5.1 Results ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">table</span> <span class="ltx_text ltx_ref_tag">5.1</span></a> and <a href="#Ch5.T2" title="In Differential Dataflow ‣ 5.1.1 Batch Processing of graphs ‣ 5.1 Results ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">table</span> <span class="ltx_text ltx_ref_tag">5.2</span></a>, Differential Dataflow was able to obtain significant speedups over the Apache Spark based version, not only was it able to offer significant speedups, it was also somewhat better than the Apache Spark implementation when it came to the overall modularity as well. Ultimately, this demonstrated that the ability to avoid performing computations where possible through the use of Differential Dataflow will eventually lead to bigger performance gains for most graphs, this may not always be the case and that scenario is discussed in further detail in <a href="#Ch5.S2.SS2" title="5.2.2 Graph Stability ‣ 5.2 Discussion ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">section</span> <span class="ltx_text ltx_ref_tag">5.2.2</span></a>.</p>
+</div>
+<section id="Ch5.S2.SS1" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">5.2.1 </span>Modularity</h4>
+
+<div id="Ch5.S2.SS1.p1" class="ltx_para">
+<p class="ltx_p">The usage of Differential Dataflow and to be more precise the result of parallelising Louvain in the manner described previously did not for the most part have a significant impact on the modularity value. Although Differential Dataflow did demonstrate a somewhat lower modularity value for the Amazon product co-purchasing network. One possible explanation for this is that these communities aren’t always well defined and can jump from categories quite easily, however, this still wouldn’t explain why the Apache Spark implementation was able to offer a near 50% increase in modularity. It is important to note still that the Differential Dataflow based method was still able to offer a better modularity for five out of the seven graph datasets, showing that a Louvain method based on Differential Dataflow is effective.</p>
+</div>
+</section>
+<section id="Ch5.S2.SS2" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">5.2.2 </span>Graph Stability</h4>
+
+<div id="Ch5.S2.SS2.p1" class="ltx_para">
+<p class="ltx_p">From our results, it seems that there is a certain property of the graphs that seem to impact the overall stability of both the time to terminate and in some cases the modularity itself. Consider for example the AS-733, email-Eu-core and Malaria-HVR_3 datasets which stabilised and terminated competely by themselves without our non-termination prevention technique coming into play. In the case of email-Eu-core, it is not too dissimilar to Wikipedia-Chameleon, in this case we observe that Wikipedia-Chameleon takes about two seconds compared to the fast 378ms runtime of the email-Eu-core graph, while Wikipedia-Chameleon is a bigger dataset, it is not <span class="ltx_text ltx_font_italic">significantly</span> bigger than email-Eu-core, this can be shown in more perspective through contrasting the runtime and size of the Wikipedia-Squirrel dataset with Wikipedia-Chameleon. It is difficult to make a claim regarding what property of a graph is responsible for the stability of the communities, however, one likely heuristic that <span class="ltx_text ltx_font_italic">could</span> be used to determine the graph stability is the edge to node ratio, we would like to make the speculation that a higher edge to node ratio generally reduces the probability of an unstable graph community structure but further research is needed here to provide evidence for this conjecture.</p>
+</div>
+</section>
+<section id="Ch5.S2.SS3" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">5.2.3 </span>Domino Effect</h4>
+
+<div id="Ch5.S2.SS3.p1" class="ltx_para">
+<p class="ltx_p">Unfortunately, one potential pitfall of using Differential Dataflow for the Louvain method is the degradation in performance when the advantages of using Differential Dataflow are not present and our implementation degrades to a slower version of the same algorithm due to us paying the runtime costs of Differential Dataflow. This occurs when there is a large domino effect due to a change in the classification of a vertex, simply put this change may induce another change which may induce another and so on. This is ultimately related to the Graph Stability mentioned in <a href="#Ch5.S2.SS2" title="5.2.2 Graph Stability ‣ 5.2 Discussion ‣ Chapter 5 Results &amp; Discussion ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">section</span> <span class="ltx_text ltx_ref_tag">5.2.2</span></a>. This is difficult to prevent as it is difficult to determine if these induced changes contributed to increasing the modularity of our graph in a meaningful way or not.</p>
+</div>
+</section>
+<section id="Ch5.S2.SS4" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">5.2.4 </span>Usage in real-time systems</h4>
+
+<div id="Ch5.S2.SS4.p1" class="ltx_para">
+<p class="ltx_p">From the above results, a Differential Dataflow based Louvain method may be appropriate for some usage in real-time systems for some graph structures, but there may be some graph that has highly unstable community structures which would cause a Differential Dataflow based Louvain method to be far slower than ideal, perhaps even slower than a sequential non-incremental version. Further investigation here is warranted to investigate how to determine what exactly determines the stability properties of a graph’s community structure.</p>
+</div>
+</section>
+</section>
+</section>
+<section id="Ch6" class="ltx_chapter">
+<h2 class="ltx_title ltx_title_chapter">
+<span class="ltx_tag ltx_tag_chapter">Chapter 6 </span>Conclusion &amp; Further Work</h2>
+
+<section id="Ch6.S1" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">6.1 </span>Future Work</h3>
+
+<section id="Ch6.S1.SS1" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">6.1.1 </span>Differential Dataflow</h4>
+
+<div id="Ch6.S1.SS1.p1" class="ltx_para">
+<p class="ltx_p">Unfortunately at this stage, we believe that Differential Dataflow is not completely ready yet to be used in general purpose incremental programs without willing to pay a significant software engineering cost as a result of the inherent complexity of using a hardly documented, research piece of software. An interesting approach to solving this problem could be perhaps to expose the ability to perform incremental computations at a higher abstraction layer, this is very much inline with the approach taken by the other ‘Big-Data’ processing frameworks such as Apache Spark. This hypothetical implementation also may gain an advantage due to its incremental computational model relying on a partial ordering of entries, although this should be explored in more detail, the advantage could be the ability to avoid implementing a variant of the Chandy-Lamport algorithm which is needed to ensure recovery from failures.</p>
+</div>
+</section>
+<section id="Ch6.S1.SS2" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">6.1.2 </span>Differential Dataflow Operators</h4>
+
+<div id="Ch6.S1.SS2.p1" class="ltx_para">
+<p class="ltx_p">Unfortunately, even certain trivially incremental operators such as ‘max’ and ‘min’ are not available through the open source implementation, future work could examine how more operators could be added to Differential Dataflow in order to increase its expressive power.</p>
+</div>
+</section>
+<section id="Ch6.S1.SS3" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">6.1.3 </span>Other Graph Clustering Methods</h4>
+
+<div id="Ch6.S1.SS3.p1" class="ltx_para">
+<p class="ltx_p">While we have demonstrated how Differential Dataflow could be used to implement Louvain modularity optimisation, we have not explored the efficacy of other graph clustering methods, it is likely worth the effort to explore how other graph clustering algorithms could be implemented in such a way that it is able to take advantage of incremental computations, it may be the case that some traditionally more costly algorithms end up being significantly cheaper when differential dataflow is used.</p>
+</div>
+</section>
+<section id="Ch6.S1.SS4" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">6.1.4 </span>Incremental Hierarchical clustering</h4>
+
+<div id="Ch6.S1.SS4.p1" class="ltx_para">
+<p class="ltx_p">If we are able to generalise even more on the partial ordering of time implemented in differential dataflow, we could use this to provide movement of already agglomerated vertices between clusters, what this means is that there is potential for modularity greater than what Louvain would normally find. The change here would be to represent time as vector of length three, this is not too different from the existing implementation, the additional entry here would simply represent the number of times a given node has been agglomerated. When new nodes are added, we would be able to examine if a certain vertex belongs in a different community due to this change, when the answer to this question is yes, a certain amount of work would be performed to propagate these changes throughout the hierarchy, the important distinction is that when communities remain the same, this work would be avoided entirely.</p>
+</div>
+</section>
+<section id="Ch6.S1.SS5" class="ltx_subsection">
+<h4 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">6.1.5 </span>Unifying “Self Adjusting Computations”</h4>
+
+<div id="Ch6.S1.SS5.p1" class="ltx_para">
+<p class="ltx_p">While “Self Adjusting Computations” are not directly usable for the computation of dataflow programs <cite class="ltx_cite ltx_citemacro_cite">[<a href="#bib.bib8" class="ltx_ref">19</a>]</cite>, there is potential for unifying “Self Adjusting Computations” for the purpose of incremental reductions. As mentioned previously the ‘reduce’ operator does not have any incremental properties due to the expressiveness of the operator, using “Self Adjusting Computations” here could prove to be a significant advantage in incrementally performing our reductions, this would reduce our max <math id="Ch6.S1.SS5.p1.m1" class="ltx_Math" alttext="Q" display="inline"><mi>Q</mi></math> determination from <math id="Ch6.S1.SS5.p1.m2" class="ltx_Math" alttext="\mathcal{O}(n)" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow></math> to <math id="Ch6.S1.SS5.p1.m3" class="ltx_Math" alttext="\mathcal{O}(1)" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mn>1</mn><mo stretchy="false">)</mo></mrow></mrow></math> in the best case, where <math id="Ch6.S1.SS5.p1.m4" class="ltx_Math" alttext="n" display="inline"><mi>n</mi></math> is the number of neighbours.</p>
+</div>
+</section>
+</section>
+<section id="Ch6.S2" class="ltx_section">
+<h3 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">6.2 </span>Conclusion</h3>
+
+<div id="Ch6.S2.p1" class="ltx_para">
+<p class="ltx_p">We have presented how the Louvain modularity optimisation algorithm could be implemented with Differential Dataflow and demonstrated its efficacy in performing incremental adjustments, we believe that this technique makes the act of incremental graph clustering via the Louvain method a viable candidate in <span class="ltx_text ltx_font_italic">some</span> real time applications. Additionally, the implementation of Louvain on top of ‘Timely Dataflow’ through the Differential Dataflow library provides an excellent way to parallelise the method over multiple cores and even multiple machines.</p>
+</div>
+</section>
+</section>
+<section id="bib" class="ltx_bibliography">
+<h2 class="ltx_title ltx_title_bibliography">References</h2>
+
+<ul id="bib.L1" class="ltx_biblist">
+<li id="bib.bib22" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[1]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">Z. Abbas, V. Kalavri, P. Carbone, and V. Vlassov</span><span class="ltx_text ltx_bib_year"> (2018)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Streaming graph partitioning: an experimental study</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Proceedings of the VLDB Endowment</span> <span class="ltx_text ltx_bib_volume">11</span> (<span class="ltx_text ltx_bib_number">11</span>), <span class="ltx_text ltx_bib_pages"> pp. 1590–1603</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib12" class="ltx_bibitem ltx_bib_book">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[2]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">U. A. Acar</span><span class="ltx_text ltx_bib_year"> (2005)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Self-adjusting computation</span>.
+</span>
+<span class="ltx_bibblock"> <span class="ltx_text ltx_bib_publisher">Carnegie Mellon University</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S2.p1" title="2.2 Incremental Computation ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.2</span></a>,
+<a href="#Ch2.S4.p1" title="2.4 Incremental Dataflow ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.4</span></a>.
+</span>
+</li>
+<li id="bib.bib9" class="ltx_bibitem ltx_bib_misc">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[3]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">Y. Ahmad, O. Kennedy, C. Koch, and M. Nikolic</span><span class="ltx_text ltx_bib_year"> (2012)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">DBToaster: higher-order delta processing for dynamic, frequently fresh views</span>.
+</span>
+<span class="ltx_bibblock">External Links: <span class="ltx_text ltx_bib_links"><span class="ltx_text ltx_bib_external">1207.0137</span></span>
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S3.p1" title="2.3 Incremental View Maintenance ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.3</span></a>.
+</span>
+</li>
+<li id="bib.bib21" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[4]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">C. Alzate and J. A. Suykens</span><span class="ltx_text ltx_bib_year"> (2008)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Multiway spectral clustering with out-of-sample extensions through weighted kernel pca</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">IEEE transactions on pattern analysis and machine intelligence</span> <span class="ltx_text ltx_bib_volume">32</span> (<span class="ltx_text ltx_bib_number">2</span>), <span class="ltx_text ltx_bib_pages"> pp. 335–347</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib14" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[5]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">P. Bhatotia, A. Wieder, R. Rodrigues, U. A. Acar, and R. Pasquin</span><span class="ltx_text ltx_bib_year"> (2011)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Incoop: mapreduce for incremental computations</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">Proceedings of the 2nd ACM Symposium on Cloud Computing</span>,
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_pages"> pp. 1–14</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S4.p1" title="2.4 Incremental Dataflow ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.4</span></a>.
+</span>
+</li>
+<li id="bib.bib38" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[6]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">V. D. Blondel, J. Guillaume, R. Lambiotte, and E. Lefebvre</span><span class="ltx_text ltx_bib_year"> (2008)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Fast unfolding of communities in large networks</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Journal of statistical mechanics: theory and experiment</span> <span class="ltx_text ltx_bib_volume">2008</span> (<span class="ltx_text ltx_bib_number">10</span>), <span class="ltx_text ltx_bib_pages"> pp. P10008</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch1.S1.p1" title="1.1 Introduction ‣ Chapter 1 Introduction ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§1.1</span></a>,
+<a href="#Ch2.S6.p1" title="2.6 Modularity Optimisation ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.6</span></a>,
+<a href="#Ch2.S7.p1" title="2.7 The Louvain Algorithm ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.7</span></a>,
+<a href="#Ch2.S8.p1" title="2.8 Limits of modularity ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.8</span></a>,
+<a href="#Ch3.S2.SS4.p1" title="3.2.4 Implementation ‣ 3.2 Dataflow Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§3.2.4</span></a>,
+<span class="ltx_ref ltx_ref_self"><span class="ltx_text ltx_ref_title">Incremental, Data-Parallel Graph Clustering</span></span>.
+</span>
+</li>
+<li id="bib.bib20" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[7]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">A. Clauset, M. E. Newman, and C. Moore</span><span class="ltx_text ltx_bib_year"> (2004)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Finding community structure in very large networks</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Physical review E</span> <span class="ltx_text ltx_bib_volume">70</span> (<span class="ltx_text ltx_bib_number">6</span>), <span class="ltx_text ltx_bib_pages"> pp. 066111</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib13" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[8]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">J. Dean and S. Ghemawat</span><span class="ltx_text ltx_bib_year"> (2004)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">MapReduce: simplified data processing on large clusters</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S5.p1" title="2.5 Iterative Dataflow ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.5</span></a>.
+</span>
+</li>
+<li id="bib.bib34" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[9]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">S. Fortunato</span><span class="ltx_text ltx_bib_year"> (2010)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Community detection in graphs</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Physics reports</span> <span class="ltx_text ltx_bib_volume">486</span> (<span class="ltx_text ltx_bib_number">3-5</span>), <span class="ltx_text ltx_bib_pages"> pp. 75–174</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S8.p1" title="2.8 Limits of modularity ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.8</span></a>.
+</span>
+</li>
+<li id="bib.bib15" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[10]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">M. R. Garey, D. S. Johnson, and L. Stockmeyer</span><span class="ltx_text ltx_bib_year"> (1974)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Some simplified np-complete problems</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">Proceedings of the sixth annual ACM symposium on Theory of computing</span>,
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_pages"> pp. 47–63</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib35" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[11]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">R. Guimera, M. Sales-Pardo, and L. A. N. Amaral</span><span class="ltx_text ltx_bib_year"> (2004)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Modularity from fluctuations in random graphs and complex networks</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Physical Review E</span> <span class="ltx_text ltx_bib_volume">70</span> (<span class="ltx_text ltx_bib_number">2</span>), <span class="ltx_text ltx_bib_pages"> pp. 025101</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S8.p1" title="2.8 Limits of modularity ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.8</span></a>.
+</span>
+</li>
+<li id="bib.bib30" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[12]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">A. Gupta, I. S. Mumick, and V. S. Subrahmanian</span><span class="ltx_text ltx_bib_year"> (1993)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Maintaining views incrementally</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">ACM SIGMOD Record</span> <span class="ltx_text ltx_bib_volume">22</span> (<span class="ltx_text ltx_bib_number">2</span>), <span class="ltx_text ltx_bib_pages"> pp. 157–166</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S3.p1" title="2.3 Incremental View Maintenance ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.3</span></a>.
+</span>
+</li>
+<li id="bib.bib10" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[13]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">M. A. Hammer, K. Y. Phang, M. Hicks, and J. S. Foster</span><span class="ltx_text ltx_bib_year"> (2014-06)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Adapton: composable, demand-driven incremental computation</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">SIGPLAN Not.</span> <span class="ltx_text ltx_bib_volume">49</span> (<span class="ltx_text ltx_bib_number">6</span>), <span class="ltx_text ltx_bib_pages"> pp. 156–166</span>.
+</span>
+<span class="ltx_bibblock">External Links: <span class="ltx_text ltx_bib_links"><span class="ltx_text issn ltx_bib_external">ISSN 0362-1340</span>,
+<a href="https://doi.org/10.1145/2666356.2594324" title="" class="ltx_ref ltx_bib_external">Link</a>,
+<a href="https://dx.doi.org/10.1145/2666356.2594324" title="" class="ltx_ref doi ltx_bib_external">Document</a></span>
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S2.p1" title="2.2 Incremental Computation ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.2</span></a>.
+</span>
+</li>
+<li id="bib.bib5" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[14]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">J. Hopcroft, O. Khan, B. Kulis, and B. Selman</span><span class="ltx_text ltx_bib_year"> (2003)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Natural communities in large linked networks</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">Proceedings of the Ninth ACM SIGKDD International Conference on Knowledge Discovery and Data Mining</span>,
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_series">KDD ’03</span>, <span class="ltx_text ltx_bib_place">New York, NY, USA</span>, <span class="ltx_text ltx_bib_pages"> pp. 541–546</span>.
+</span>
+<span class="ltx_bibblock">External Links: <span class="ltx_text ltx_bib_links"><span class="ltx_text isbn ltx_bib_external">ISBN 1581137370</span>,
+<a href="https://doi.org/10.1145/956750.956816" title="" class="ltx_ref ltx_bib_external">Link</a>,
+<a href="https://dx.doi.org/10.1145/956750.956816" title="" class="ltx_ref doi ltx_bib_external">Document</a></span>
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib18" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[15]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">B. W. Kernighan and S. Lin</span><span class="ltx_text ltx_bib_year"> (1970)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">An efficient heuristic procedure for partitioning graphs</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">The Bell system technical journal</span> <span class="ltx_text ltx_bib_volume">49</span> (<span class="ltx_text ltx_bib_number">2</span>), <span class="ltx_text ltx_bib_pages"> pp. 291–307</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib23" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[16]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">K. Lang and S. Rao</span><span class="ltx_text ltx_bib_year"> (2004)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">A flow-based method for improving the expansion or conductance of graph cuts</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">International Conference on Integer Programming and Combinatorial Optimization</span>,
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_pages"> pp. 325–337</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib24" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[17]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">J. Leskovec, K. J. Lang, and M. Mahoney</span><span class="ltx_text ltx_bib_year"> (2010)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Empirical comparison of algorithms for network community detection</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">Proceedings of the 19th international conference on World wide web</span>,
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_pages"> pp. 631–640</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib27" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[18]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">H. Lu, M. Halappanavar, and A. Kalyanaraman</span><span class="ltx_text ltx_bib_year"> (2015)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Parallel heuristics for scalable community detection</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Parallel Computing</span> <span class="ltx_text ltx_bib_volume">47</span>, <span class="ltx_text ltx_bib_pages"> pp. 19–37</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch3.S1.SS1.p1" title="3.1.1 Negative gain scenario ‣ 3.1 Parallel Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§3.1.1</span></a>,
+<a href="#Ch3.S1.p1" title="3.1 Parallel Louvain ‣ Chapter 3 Method ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§3.1</span></a>.
+</span>
+</li>
+<li id="bib.bib8" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[19]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">F. McSherry, D. G. Murray, R. Isaacs, and M. Isard</span><span class="ltx_text ltx_bib_year"> (2013)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Differential dataflow.</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">CIDR</span>,
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch1.S1.p1" title="1.1 Introduction ‣ Chapter 1 Introduction ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§1.1</span></a>,
+<a href="#Ch1.S3.SS1.p1" title="1.3.1 Differential Dataflow ‣ 1.3 Motivation ‣ Chapter 1 Introduction ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§1.3.1</span></a>,
+<a href="#Ch6.S1.SS5.p1" title="6.1.5 Unifying “Self Adjusting Computations” ‣ 6.1 Future Work ‣ Chapter 6 Conclusion &amp; Further Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§6.1.5</span></a>.
+</span>
+</li>
+<li id="bib.bib32" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[20]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">D. G. Murray, F. McSherry, R. Isaacs, M. Isard, P. Barham, and M. Abadi</span><span class="ltx_text ltx_bib_year"> (2013)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Naiad: a timely dataflow system</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">Proceedings of the Twenty-Fourth ACM Symposium on Operating Systems Principles</span>,
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_pages"> pp. 439–455</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch1.S3.SS1.SSSx1.p1" title="Timely Dataflow ‣ 1.3.1 Differential Dataflow ‣ 1.3 Motivation ‣ Chapter 1 Introduction ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§1.3.1</span></a>,
+<a href="#Ch2.S2.p1" title="2.2 Incremental Computation ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.2</span></a>.
+</span>
+</li>
+<li id="bib.bib4" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[21]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">M. E. J. Newman and M. Girvan</span><span class="ltx_text ltx_bib_year"> (2004-02)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Finding and evaluating community structure in networks</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Physical Review E</span> <span class="ltx_text ltx_bib_volume">69</span> (<span class="ltx_text ltx_bib_number">2</span>).
+</span>
+<span class="ltx_bibblock">External Links: <span class="ltx_text ltx_bib_links"><span class="ltx_text issn ltx_bib_external">ISSN 1550-2376</span>,
+<a href="http://dx.doi.org/10.1103/PhysRevE.69.026113" title="" class="ltx_ref ltx_bib_external">Link</a>,
+<a href="https://dx.doi.org/10.1103/physreve.69.026113" title="" class="ltx_ref doi ltx_bib_external">Document</a></span>
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>,
+<a href="#Ch2.S6.p1" title="2.6 Modularity Optimisation ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.6</span></a>.
+</span>
+</li>
+<li id="bib.bib3" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[22]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">M. E. J. Newman</span><span class="ltx_text ltx_bib_year"> (2004-06)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Fast algorithm for detecting community structure in networks</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Physical Review E</span> <span class="ltx_text ltx_bib_volume">69</span> (<span class="ltx_text ltx_bib_number">6</span>).
+</span>
+<span class="ltx_bibblock">External Links: <span class="ltx_text ltx_bib_links"><span class="ltx_text issn ltx_bib_external">ISSN 1550-2376</span>,
+<a href="http://dx.doi.org/10.1103/PhysRevE.69.066133" title="" class="ltx_ref ltx_bib_external">Link</a>,
+<a href="https://dx.doi.org/10.1103/physreve.69.066133" title="" class="ltx_ref doi ltx_bib_external">Document</a></span>
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib31" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[23]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">V. Nigam, L. Jia, B. T. Loo, and A. Scedrov</span><span class="ltx_text ltx_bib_year"> (2012)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Maintaining distributed logic programs incrementally</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Computer Languages, Systems &amp; Structures</span> <span class="ltx_text ltx_bib_volume">38</span> (<span class="ltx_text ltx_bib_number">2</span>), <span class="ltx_text ltx_bib_pages"> pp. 158–180</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S3.p1" title="2.3 Incremental View Maintenance ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.3</span></a>.
+</span>
+</li>
+<li id="bib.bib36" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[24]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">J. Reichardt and S. Bornholdt</span><span class="ltx_text ltx_bib_year"> (2006)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Statistical mechanics of community detection</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Physical review E</span> <span class="ltx_text ltx_bib_volume">74</span> (<span class="ltx_text ltx_bib_number">1</span>), <span class="ltx_text ltx_bib_pages"> pp. 016110</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S8.p1" title="2.8 Limits of modularity ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.8</span></a>.
+</span>
+</li>
+<li id="bib.bib6" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[25]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">S. E. Schaeffer</span><span class="ltx_text ltx_bib_year"> (2007)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Graph clustering</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Computer science review</span> <span class="ltx_text ltx_bib_volume">1</span> (<span class="ltx_text ltx_bib_number">1</span>), <span class="ltx_text ltx_bib_pages"> pp. 27–64</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib25" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[26]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">I. Stanton and G. Kliot</span><span class="ltx_text ltx_bib_year"> (2012)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Streaming graph partitioning for large distributed graphs</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">Proceedings of the 18th ACM SIGKDD international conference on Knowledge discovery and data mining</span>,
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_pages"> pp. 1222–1230</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+<li id="bib.bib33" class="ltx_bibitem ltx_bib_book">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[27]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">R. S. Xin</span><span class="ltx_text ltx_bib_year"> (2018)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Go with the flow: graphs, streaming and relational computations over distributed dataflow</span>.
+</span>
+<span class="ltx_bibblock"> <span class="ltx_text ltx_bib_publisher">University of California, Berkeley</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch4.S1.SS2.p1" title="4.1.2 Disadvantages impacting Differential Dataflow ‣ 4.1 Experiment setup ‣ Chapter 4 Experiments ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§4.1.2</span></a>.
+</span>
+</li>
+<li id="bib.bib26" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_key ltx_role_refnum ltx_tag_bibitem">[28]</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_author">H. Zanghi, C. Ambroise, and V. Miele</span><span class="ltx_text ltx_bib_year"> (2008)</span>
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Fast online graph clustering via erdős–rényi mixture</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Pattern recognition</span> <span class="ltx_text ltx_bib_volume">41</span> (<span class="ltx_text ltx_bib_number">12</span>), <span class="ltx_text ltx_bib_pages"> pp. 3592–3599</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#Ch2.S1.p1" title="2.1 Graph Partitioning ‣ Chapter 2 Background &amp; Related Work ‣ Incremental, Data-Parallel Graph Clustering" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1</span></a>.
+</span>
+</li>
+</ul>
+</section>
+<div id="p1" class="ltx_para">
+<p class="ltx_p"></p>
+</div>
+</article>
+</div>   </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>   

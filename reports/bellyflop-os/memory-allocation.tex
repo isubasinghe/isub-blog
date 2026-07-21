@@ -1,0 +1,106 @@
+\chapter{Memory Allocator}
+
+As the first step, we had to implement a physical memory allocator.
+This would serve as the basis for everything else. 
+It thus had to be as robust as possible or it could cause major pains when discovering bugs later in the project.
+
+We chose to implement a "Next Fit" Allocation strategy, maintaining the free memory blocks in a linked list. We picked Next Fit because it was recommended in the lecture. There was also a plan to go for a more sophisticated approach should we run into performance issues. In the end, the Memory Allocator was never a bottleneck for us.
+
+\section{Free List}
+The free list is composed of two nested lists.
+
+The memory manager is initialized with a set of memory region capabilities.
+These memory region capabilities each have their own node in a circular linked list.
+We will refer to this list as the region list.
+
+Each node in the region list also contains a second linked list that keeps track of which sections of the region are free.
+We call this the sections list.
+It is a sorted list of disjoint intervals of free memory.
+Two nodes with bordering intervals are always merged into one node.
+This makes allocation easy and quick.
+
+The data structure also keeps track of the last position that memory was allocated from.
+This is needed for the Next Fit strategy.
+
+\begin{figure}[ht]
+    \centering
+    \scalebox{0.5}{\includesvg{./figs/free_list.svg} }
+
+    \caption{General Overview of the Free List. Memory region capabilities are stored in a circular list. Each of the nodes maintains its own list to keep track of free sections in the region.}
+    \label{fig:free_list}
+\end{figure}
+
+\section{Allocating memory}
+The interface allows the user to specify both size and the alignment requirements for the requested chunk of memory.
+The alignment parameter is optional.
+
+When allocating memory, the allocator continues walking through the free sections list from the last position that it has allocated from.
+
+If it finds a section of a region that fits the given requirements (size and alignment) it removes the interval from the free section node.
+This can either cause the node to be deleted (if the entire section of the node is allocated), split (if the allocated section is in the middle of the node), or simply decremented from the lower or upper bound.
+The allocator then allocates a new capability slot and retypes the region capability to the allocated range.
+The next allocation operation will start looking from the next node after the allocated chunk.
+
+When the end of the free sections list for a region is reached, the allocator proceeds to the next region and tries again.
+This is repeated until either a chunk of memory is allocated or the allocator reaches the point in the list where it started and returns an error saying that space for the asked allocation could not be found.
+
+\section{Freeing memory}
+Freeing memory works analogously to allocating it.
+First, the allocator iterates through the region list until the region capability that the freed capability was retyped from is found.
+It then walks through the free section list of this region until it finds the position where the interval should be inserted.
+The node is inserted or merged with the previous or next interval (or both) if they form a joint interval.
+The passed capability is then destroyed.
+
+If the capability is already (partially) freed then freeing it again will result in a \mintinline{c}{LIB_ERR_FREE_LIST_DOUBLE_FREE} error.
+
+\subsection{Partial Frees}
+Our implementation also trivially allowed us to implement partial frees.
+Since these are just another retype of the handed out capability, they will be accepted by the interface and the memory region will be freed.
+
+However, trying to free a ram capability that has already been partially freed will result in an error, specifically \mintinline{c}{LIB_ERR_FREE_LIST_DOUBLE_FREE}.
+The following code snippet shows \textbf{how to recreate this failure}:
+\begin{minted}{c}
+struct capref cap, split_cap;
+...
+mm_alloc(mm, total_size, &cap);
+cap_retype(split_cap, cap, 0, ObjType_RAM, total_size / 2, 1);
+
+mm_free(mm, split_cap);
+// This call will result in a double free.
+err = mm_free(mm, cap);
+\end{minted}
+Instead, the user should retype the \mintinline{c}{cap} again to obtain a capability for the other half and free that.
+
+
+\subsection{Thread Safety}
+
+To allow concurrent access to the memory manager all operations must first obtain a lock.
+This is needed since our memory server runs on a separate thread in the init domain. This means that memory allocations might happen concurrently. 
+
+
+Since the memory server needs to be able to fulfill nested allocation requests, the lock needs to be re-entrant.
+
+The challenges of providing Memory Allocation as an RPC service are discussed in detail in \autoref{sec:mem_server}.
+
+\section{Refilling Slot and Slab Allocators}
+The memory manager itself also needs to allocate memory to maintain its data structure.
+For this it uses both a slot allocator (for the capabilities) and two slab allocator (for the two types of list nodes).
+However, the allocator itself needs to refill these periodically before they run out of space.
+
+When the free space in any of the allocators falls under a certain threshold, 
+the memory manager allocates chunks of the physical memory it maintains and passes them to the respective allocators.
+First though, it sets a flag to indicate that it is refilling. 
+This must be done in order to prevent an infinite recursion of refills.
+
+\subsection{Thresholds}
+The memory manager will begin refilling the slab allocator for the region nodes when there are two or less blocks available.
+It will refill the free sections list slab allocator if there are at most free 32 blocks left.
+While there is no strict reasoning behind the choice of these numbers, there is at least some thought behind it:
+
+For the region slab allocator it would technically be sufficient to refill it when there is just one block left. 
+These nodes are only allocated when adding new memory regions. 
+So when the last spot would be filled up, the memory allocator could use the memory in that region to refill this slab allocator.
+We chose to be slightly more conservative and refill when there are two blocks left.
+
+The free section list slab allocator needs to be refilled sooner, since allocating memory can lead to the creation of new nodes as described earlier.
+We again choose a conservative number and refill at 32 free blocks.

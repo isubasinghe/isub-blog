@@ -1,0 +1,34 @@
+\chapter{Shell}
+Since only a single process can write to the serial output, some extra engineering effort was required to ensure this property was maintained while still not majorly impacting how the libc's standard functions worked. 
+
+\section{Terminal Service}
+The shell along with other processes on the system are configured to make RPC requests to the terminal service in order to interact with the UART device. This involved using the nameserver to register a service along with an appropriate handler function to handle terminal related RPC requests. 
+
+\subsection{User space UART}
+For the user space UART to work, the terminal service expects a device capability to the UART device being mapped into one of the argument capability slots. We use the \mintinline{c}{map_device_register} function along with the relevant memory location data to map the device frame into our virtual address space. From here it is as simple as calling the \mintinline{c}{lpuart_init} function to initialise the driver. 
+
+\subsection{Interrupts not delivered}
+Unfortunately, despite correctly (at least seemingly) configuring the GIC and the user space UART, we were unable to receive interrupts. In order to address this, we had to re-evaluate how input would work, the solution we eventually ended up going with was to simply read in a busy loop for input. While this did solve our problem, it did unfortunately introduce a large performance penalty. 
+
+\subsection{Multiplexing Input/Output}
+Multiplexing output was quite trivial due to how we implemented the printf functionality. Whenever we received a whole string, we simply printed that out. This does mean that it is possible for a foreground domain to mangle output, however this is a user level error. Multiplexing input was however much harder. We achieved this through locks as described in the session management section \ref{sec:sessions}.
+
+\subsubsection{Session management}
+\label{sec:sessions}
+As mention previously, it is critical that only a single process owns access to the serial input interface. In order to achieve this we explored several venues such as allocating the UART device to a single process until a newline character has been read. However, in order to give the caller more control, we provided a method to lock and release a lock used to indicate ownership of the UART interface's read capability.
+
+\subsubsection{Lazy terminal initialisation}
+Unfortunately, due to constraints where (chronologically) the libc glue code was initialised we were not able to obtain a terminal instance and directly connect the IO functions. In order to provide a solution for this, we implemented a lazy loading of the terminal service. This was achieved by delaying the connection attempt till after a user space write/read call was made. 
+
+
+\section{Shell}
+The shell itself is quite simple and is just a wrapper over the terminal. It of course does allow for process spawning and other shell related functionality. For the shell, we implemented a custom recursive descent parser in order to parse commands, although in hindsight such a parser is likely overkill. From this point onward, we simply do a `strcmp' for each available command and simply call the appropriate function.  
+
+\section{Improvements}
+
+\subsection{UART as a capability}
+Given the nature of Barellfish and its existing capability system,  it does make sense to have a capability type for the serial input/output interface. This not only makes sense from an ergonomic perspective but may help deter the current existing attack vectors. For example, currently a process is capable of faking it's pid in the request to the terminal service. This is obviously not the desired behaviour. Unfortunately, due to the complexity of the capability system we did not want to explore how to implement such a capability since we had other time pressing issues.
+
+\subsection{First Come/First Serve}
+The consequence of having the lock on the serial interface means that a single process can hold onto the interface for an extended period of time. Unfortunately there are no solutions here to multiplex this better outright. The various other solutions require tradeoffs and we
+decided that the tradeoff offered via this central locking scheme was more attractive than other multiplexing methods, for example such as a newline character for example.

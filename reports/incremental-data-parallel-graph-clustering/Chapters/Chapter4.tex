@@ -1,0 +1,78 @@
+\chapter{Experiments}
+
+\section{Experiment setup}
+There were multiple implementations of Louvain used in determining the effectiveness of the developed dataflow based Louvain algorithm. The first implementation was through Apache Spark, this implementation was based on an open source implementation of Louvain provided on Github with some modifications made to accommodate fair testing, as a result of us removing the agglomerative step in our Differential Dataflow implementation we did the same in the Apache Spark version.
+
+\subsection{Justification of Apache Spark based Louvain method for baseline}
+To our knowledge, there is no other method of combining incremental and iterative computations to dataflow computations with the exception of Differential Dataflow. Apache Spark and the Pregel based abstraction layer exposed via GraphX, isn't completely at a disadvantage here however, since GraphX does provide incremental view maintenance capability along with other optimisations listed below in \cref{items:disadvantages}.
+
+\subsection{Disadvantages impacting Differential Dataflow}
+Unfortunately, differential dataflow does not have an advantage in some tasks of dataflow computations, largely as a result of the of features present in Spark that Differential Dataflow lacks, at the end of the day, it is important to note that Differential Dataflow is an academia oriented library/framework where Apache Spark has been improved on over several years with major companies in industry using it for their `big-data' processing needs. The lack of these features unfortunately negatively impacts the performance of Differential Dataflow, these potential areas of improvement for Differential Dataflow should be taken into account when comparing results. The list of features available in Apache Spark's GraphX abstraction are listed below for the purposes of providing more perspective:
+\begin{itemize}
+    \label{items:disadvantages}
+    \item Index Reuse
+    \item Vertex Mirroring
+    \item Multicast join
+    \item Partial Materialisation
+    \item Incremental View Maintenance
+    \item Automatic Join Elimination
+    \item Variable Integer Encoding
+\end{itemize}
+More such optimisations and details regarding what these optimisation enable in GraphX are presented in extensive detail in \cite{xin2018go}. Note that some of the above optimisations will not necessarily improve performance with Differential Dataflow, for example the Incremental View Maintenance optimisation in GraphX. 
+
+\subsection{Testing Environment}
+\subsubsection{Testing Environment - Rust}
+\begin{itemize}
+    \item CPU - AMD Ryzen™ 7 3700X @ 3.6-4.4GHz
+    \item \#CPUs - 8
+    \item Memory - 32GB DDR4
+    \item Disk - Samsung 970 EVO Plus NVMe M.2 SSD
+    \item Compiler - Rust 1.57.0-nightly
+\end{itemize}
+\subsubsection{Testing Environment - Spark}
+\begin{itemize}
+    \item CPU - AMD Ryzen™ 7 3700X @ 3.6-4.4GHz
+    \item \#CPUs - 8
+    \item Memory - 32GB DDR4
+    \item Disk - Samsung 970 EVO Plus NVMe M.2 SSD
+    \item Scala - 2.12.0
+    \item Spark - 3.0.2
+    \item Java - Amazon Corretto 1.8.0\_320
+\end{itemize}
+
+\subsection{Datasets}
+The datasets were obtained from the set of graph databases available from the Stanford large graph database collection \footnote{See \url{https://snap.stanford.edu/data/}}. These graphs varied in size and included fairly large datasets such as the Amazon product co-purchasing dataset.
+
+\begin{table}[!h]
+    \centering
+    \resizebox{\columnwidth}{!}{%
+    \begin{tabular}{||c|c|c|c|c||}
+        \hline
+           Dataset     & Nodes  & Edges  & Average clustering coefficient  & Nodes in largest SCC \\ \hline
+        \text{AS-733}  & 6474   &   13895   &  0.2522 & 6474 \\ 
+        \hline
+        \text{Amazon}  & 334863 &   925872  &  0.3967 & 334863 \\
+        \hline
+        \text{email-Eu-core} & 1005 &  25571  & 0.3994 & 803 \\
+        \hline
+        \text{Wikipedia-Crocodile} & 11631 &  170918   & UNSPECIFIED & UNSPECIFIED \\
+        \hline
+        \text{Wikipedia-Chameleon} & 2277  &  31421  & UNSPECIFIED & UNSPECIFIED \\
+        \hline
+        \text{Wikipedia-Squirrel} & 5201 &  198493  & UNSPECIFIED & UNSPECIFIED \\
+        \hline
+        \text{Malaria-HVR\_3} & 36 &  418  & UNSPECIFIED & UNSPECIFIED \\
+        \hline
+    \end{tabular}%
+    }
+    \label{table:dataset}
+    \caption{Dataset characteristics used in experiments}
+\end{table}
+
+\subsection{Experimental Process}
+For both processes we used the maximum number of cores available (8). Although we did test on different number of cores, these did not reveal much insight and therefore were not explored in our results. 
+\subsubsection{Batch Processing}
+In order to investigate the feasibility of a Differential Dataflow based Louvain method in the context of large batch processing jobs using the map reduce paradigm, we investigated how long it would take a Differential Dataflow based Louvain method to reach some modularity when compared to the previously mentioned Apache Spark based version. 
+
+\subsubsection{Incremental Processing}
+In this stage we only consider Differential Dataflow, since GraphX is not capable of providing us with an incremental computational model. The test here is quite simple, we run one single iteration of the Louvain clustering algorithm on some graph and measure the time it takes to compute a modularity for that particular graph, then we perform a single edge insertion and we measure its computation time as well. We define the time to compute the entire graph as the `single iteration batch processing time' while we define the incremental computation time as the `incremental adjustment time'.

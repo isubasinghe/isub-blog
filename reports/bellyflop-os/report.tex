@@ -1,0 +1,114 @@
+\documentclass[10pt,a4paper,titlepage]{report}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{svg}
+\usepackage{subfig}
+\usepackage{todonotes}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{tcolorbox}
+\newtcolorbox{hindsight}{colback=red!5!white,colframe=red!75!black,fonttitle=\bfseries,title=Hindsight}
+
+
+\usepackage{minted}
+\usepackage{xcolor}
+\definecolor{LightGray}{gray}{0.9}
+
+\setmintedinline {
+bgcolor=white,
+framesep=0mm,
+}
+
+
+\setminted{
+framesep=2mm,
+baselinestretch=1.2,
+bgcolor=LightGray,
+fontsize=\footnotesize,
+linenos
+}
+
+
+% How to insert code:
+% \begin{minted}{c}
+% // Test code
+% bla
+% \end{minted}
+
+% How to inline code
+% \mintinline{c}{bal} 
+
+% TODO: Replace the title with your own
+\title{Bellyflop OS Report}
+\author{Group 11}
+
+
+\begin{document}
+	
+    
+	\maketitle
+	\begin{figure}
+	    \centering
+	    \includegraphics{figs/belly_flo_orig.png}
+	    \caption{Bellyflop OS}
+	    \label{fig:belly_flop}
+	\end{figure}
+
+% 	\chapter{DEMO Delete later}
+	
+% 	TODO: WRite your report. Please also mention whether you have any limitations
+% 	(e.g., limit of mapped memory, ...) and/or whether you've done extra challenges.
+% 	\\
+% 	\\
+% 	This could be our demo, just putting this here as shared notes.
+% 	\begin{itemize}
+% 	    \item Start the device and use the terminal to run the TCP/ UDP servers.
+% 	    \item Demonstrate Echo servers
+% 	    \item Take over shell with the remote shell login.
+% 	    \item create a file and edit it.
+% 	    \item load a program from disk.
+% 	    \item TODO: Show stuff by using the shell over the remote login.
+	    
+% 	\end{itemize}
+	
+	\tableofcontents
+	
+	\input{testing.tex}
+	\input{memory-allocation.tex}
+	\input{self-paging.tex}
+	\input{processes.tex}
+	\input{multicore.tex}
+	\input{lmp.tex}
+	\input{urpc.tex}
+	\input{rpc.tex}
+	\input{shell.tex}	
+% 	\input{capabilities.tex} 
+	\input{filesystem.tex}
+	\input{nameserver.tex}
+	\input{networking.tex}
+	
+	\chapter{Feedback}
+	First we list the actionable bads.
+	\begin{itemize}
+        \item  Extra challenges later often appear as part of normal challenges.
+        \item  It's hard to split the work in a milestone, it's very often linearly dependent.
+        \item  Like ~3 weeks before the final submission it would be cool to have a ungraded grading session where we just ask about report, what should we focus on.
+        \item  A considerable amount of lecture time in the beginning of the semester was spent on explaining what we already had known from the book because we already had to implement the milestone.
+        \item  Responding on Moodle is very selective, we didn't get our questions about the grading setup answered. It's fine even if you say "Sorry, can't say more details" or something. But please don't ghost after us putting in probably small hundreds of hours.
+        \item  List of known bugs and an email announcement with every new bugfix would be nice.
+        \item  List of public functionality in the beginning of the course. Like the collections\_list, barrelfish\_usleep(), etc.
+    \end{itemize}
+    
+
+    Now we list the goods :)
+	\begin{itemize}
+	    \item Having real hardware is great
+	    \item Milestones are nice with the weekly grading session, even tough sometimes the 2 vs one week ones are not correlated with the amount of work that needs to be done.
+        \item  Demo sessions that all others can attend, which is very sadly not a possibility in every other course.
+        \item Overall we enjoyed the subject and learnt A LOT. It's a bit unfortunate that the course ends just as it all comes together and we get all the freedom to implement the fun things :)
+    \end{itemize}
+\end{document}

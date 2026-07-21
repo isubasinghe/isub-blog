@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "build:reports": "node scripts/build-report.mjs",
     "preview": "astro preview",
     "test": "vitest run"
   },

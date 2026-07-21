@@ -1,0 +1,186 @@
+\chapter{Virtual Memory}
+
+
+\section{Managing the Virtual Address Space}
+
+To manage the Virtual Address Space, we use the same Free List as described in the Memory Management Section. In the very beginning, when creating the paging state, the region \mintinline{c}{[VADDR_OFFSET,VADDR_OFFSET+BIT(48)-1]} gets added to the free list. This is all the Virtual address space.
+
+\section{Mappings}
+
+In order to keep track of the capabilities of mappings, we designed the following Shadow Page Table data structure.
+Each Shadow Page Table contains one capref to the page table capability and three arrays of size \mintinline{c}{PTABLE_ENTRIES}. This is visualized in figure \ref{fig:shadow_pt}.
+
+One of the arrays consists of pointers to the child Shadow Page Tables. If set to NULL this means that there is no child existing yet for this slot. There is a second array that stores the capabilities for the mappings to these children. Here in the L3 Shadow Page Table, the mapping is the mapping capability from the frame to the virtual memory address.
+Then we also have an array Region Size that is used to store the size of a region. This is only used for slots that start a region, and is necessary for correctly unmapping things later.
+
+For every page we want to map, we walk down the Shadow Page Tables (where we can easily calculate the slot numbers from the virtual address) and create a New Shadow Page Table if it does not exist yet. When we reach L3, we map the frame to the virtual address and store the capability for that in Child Mapping Caps. We realize that this optimization is not 100 percent optimal since we walk down the page table multiple times instead of traversing it more efficently, but we believe that this is probably very close to optimal since we walk down the same tables over and over again which means all of this should be in L1 cache. Also, this make the implementation a lot simpler and less error-prone.
+
+
+\begin{figure}[ht]
+    \centering
+    \scalebox{0.65}{\includesvg{./figs/shadow_pt.svg} }
+
+    \caption{This shows the design of the shadow page table.}
+    \label{fig:shadow_pt}
+\end{figure}
+
+% How do we map:
+\subsection{Mapping Optimization}
+
+We realized that mapping of large regions (which can not be mapped as Superpages) was very slow because we were mapping every single page as one mapping. We changed this by mapping as many pages combined as possible at the L3 Page table level (which is up to 512 pages).
+See \ref{sec:benchmapunmapp} for results of this. Now there are a lot of empty slots in the L3 Child Mapping Caps array. The space for this could be optimized away by finding a more compact memory representation. We did not look into this.
+
+\section{Unmapping}
+For unmapping we rely on the fact, that for the first page of a region, we stored the region size in our Shadow Page Table. This is neccessary since the user will only provide us the address we mapped but not the length. After we got the length we recursively walk through the table, unmapping all the mappings that are part of the region. Moreover, unmapping Page Tables and freeing Shadow Page Tables  (at L3, L2, and L1) if they end up being empty now. 
+Since this is implemented recursively, it's very easy to keep track of things. A parent tells the child to remove mappings in a region and after that checks if the child is empty now to possibly delete it.
+
+\section{Benchmarks of Map and Unmap}
+\label{sec:benchmapunmapp}
+We can see the measurements for Map and Unmap of the optimized and non optimized version in Figure \ref{fig:paging_map}. We can see that the optimization inside mapping gave a ~3750x speed-up for unmap. So why does Unmapping actually benefit so much more from it than mapping itself? As we found out \mintinline{c}{cap_delete()} is very slow, and because we create fewer mappings, we have to delete way less capabilities when unmapping.
+
+\begin{figure}[ht]
+    \centering
+         \subfloat[\centering ]{{\scalebox{0.5}{\includesvg{./figs/paging_map.svg} }}}
+         \subfloat[\centering ]{{\scalebox{0.5}{\includesvg{./figs/paging_map_opt.svg} }}}
+
+    \caption{Box plots showing the time it takes to run Map and Unmap with and without the optimization we mentioned previously. Note that one of the scales is in seconds and the other ones in milliseconds. We Map and then Unmap regions of size 64 MB, 24 times.}
+    \label{fig:paging_map}
+\end{figure}
+
+
+\section{Superpages}
+
+In order to indicate that we have a super page mapping in our shadow page table, we store a child mapping but not a child shadow page table at L2.
+This identifies that this is a mapping to a frame and not to another page table (so this entry basically looks like an entry in an L3 table, which means it does not require a lot of edge case conditions in the implementation). 
+We map as much as possible as a Superpage, i.e., whenever the Virtual address and the Physical address are both aligned to 2Mib. If we map a bigger region, that contains regions that satisfy this requirement, we map these regions as Superpages and the leftover regions as normal pages. 
+
+\section{Slab refilling}
+The paging state contains three Slab Allocators that need to be refilled at the right time to make sure they don't run out of space. This is because in order to refill them, you also need to map pages which requires space in these slab allocators.
+
+\begin{minted}{c}
+struct slab_allocator used_and_free_list_slabs;  // Slab space for the free and to-be-explained used list.
+struct slab_allocator page_table_slabs;          // Slab space to allocate shadow page tables.
+struct slab_allocator cap_store_slabs;           // Slab space for the to-be-explained Cap Store.
+\end{minted}
+
+The refilling of (\mintinline{c}{paging_refill_slabs()}) works as follows: Each of the slab allocators has a predefined threshold. If the free space goes below that threshold they set a refilling bool variable to true and call \mintinline{c}{slab_refill_no_pagefault()}. This will allocate memory and map it. While mapping, the filling of the Slab Allocator is obviously still below the threshold but it will not try to call refill again because the refilling bool variable for that Slab Allocator is set. When done with refilling, we set the bool variable to false again. 
+
+We call \mintinline{c}{paging_refill_slabs()} whenever we created a new mapping at the L3 level or handled a page fault.
+
+
+End of the story: We tried to set the thresholds to high enough magic numbers such that it definitely has to work, but did not calculate what the minimum threshold should be. We had to adjust them over time to accommodate RPCs and other stuff (actually shrinking them).
+
+
+\section{Slot Alloc causing creation of Shadow Page Tables}
+
+When creating a child Shadow Page Table one has to call \mintinline{c}{pt_alloc()} which calls \mintinline{c}{slot_alloc()} which might call \mintinline{c}{slab_refill()}. And as we previously learned, \mintinline{c}{slab_refill()} creates new mappings and while doing so, it might also create new Shadow Page Tables. This means that calling  \mintinline{c}{slot_alloc()} to create a slot for the child's mapping or PT capability might cause the creation of that Shadow Page table already. This means that in the paging code we need to carefully check after calling \mintinline{c}{pt_alloc()} or \mintinline{c}{slot_alloc()} if the child Shadow Page tables has already been created to makes sure to not overwrite it.
+
+\section{Exception Handling}
+
+In paging init we register our own exception handler by calling \mintinline{c}{thread_set_exception_handler()}. The exception handler calls User Panic for every fault that is not a Page fault and also for Page faults we could not resolve. Page faults we are able to resolve refer to lazily mapped regions, which are explained in the next section. In order to make debugging easier, we remove the region [0,4096) from the virtual address space and whenever a page fault occurs in this area of memory we attach the error \mintinline{c}{LIB_ERR_PMAP_HANDLE_PAGEFAULT_ADDR_NULLPOINTER} to the User Panic output.
+
+
+\section{Lazy Paging}
+To create a lazy page mapping, we provide the following interface. It allows specifying a region type which we will explain later.
+
+\begin{minted}{c}
+errval_t paging_map_lazy(struct paging_state *st, void **buf, size_t bytes,
+                         size_t alignment, int flags, used_region_type_t region_type)
+\end{minted}
+
+\subsection{State Handling}
+
+To manage the state introduced by allowing lazy mapped regions, we introduce two data structures:
+\begin{itemize}
+    \item Used list: Used to identify the region type of region.
+    \item Mem Cap Store: To store and manage memory capabilities; needed to lazily map pages.
+\end{itemize}
+
+\subsubsection{Used List}
+The used list is a list that manages regions and stores a type for them. It almost works the opposite way as a Free List does, but it does not join regions. The Used List is a Linked List sorted by the base address of each region, storing non overlapping regions and their corresponding types.
+The interface of the used list allows adding and removing regions but also querying for the base address, length, and type of a region.
+
+\subsubsection{Mem Cap Store}
+To manage the created memory capabilities during the lazy paging process, we created an abstraction called mem\_cap\_store. For each base address, it manages a linked list of memory capabilities, including one active capability which is always the head of the linked list. Those linked lists are stored inside a hash table.
+
+Since this Mem Cap store needs to be allocatable with a slab allocator instead of malloc, it uses our special-purpose-hand-crafted  \mintinline{c}{struct collections_static_hash_table}. This is required since during the init of the paging state, but also during the lazy mapping process, we can not use malloc. malloc would, when getting memory, try to insert into this hash table which would call malloc again.\\
+The Mem Cap Store provides three main functionalities:
+\begin{itemize}
+    \item Get the active Mem Cap: Gets the active Mem cap for a base address or a new list head with NULL\_CAP in it if the entry does not exist yet
+    \item Push Back Active: Which creates a new list head with NULL\_CAP to be the new active cap with the old active cap will being prepended
+    \item Free a base address: This deletes the entry for a specified base address and also calls a callback function provided in the initialization phase on each of the capabilities. This callback can be used to clean up those capabilities, like returning them to the memory server. (We actually set this function to a callback that does nothing, since nobody implemented the Capability project s.t. we can free memory.)
+\end{itemize}
+
+
+
+\subsubsection{Static Hash Table}
+The  \mintinline{c}{struct collections_static_hash_table} is a copy from "collections/hash\_table.c" replacing the buckets pointer with a statically sized array and collection list with a very simple linked list version. This is needed such that the list nodes can then be allocated with a slab allocator. The bucket container is of a static size since we can't call malloc inside the paging code to allocate that array.
+
+\subsection{Creating a lazy mapping}
+Allocating a lazily mapped region is now very simple. We first "allocate" a virtual address space by calling \mintinline{c}{paging_alloc}. And then add the virtual address region to the used list.
+
+\subsection{Mapping of lazily mapped pages}
+
+Whenever a page fault occurs, the page fault handler checks if the address was lazily mapped by checking the used list for lazily mapped regions and then starts the process of mapping the requested page.
+To do this, we do the following:
+\begin{minted}{c}
+struct cap_list_header* cap_list;
+cap_store_get_active(&st->lazy_mem_cap_store, base, &cap_list);
+if (capref_is_null(cap_list->active_cap)) {
+    err = frame_alloc(&frame, LAZY_MAP_CAP_SIZE, NULL);
+    cap_list->active_cap = frame;
+    cap_list->offset = 0;
+}
+paging_map_fixed_attr_internal(..., cap_list->active_cap, cap_list->offset, 
+                               BASE_PAGE_SIZE, ...);
+cap_list->offset += BASE_PAGE_SIZE;
+if(cap_list->offset == LAZY_MAP_CAP_SIZE){
+    push_back_active(&st->lazy_mem_cap_store, cap_list);
+}
+\end{minted}
+This code tries to get the active memory capability. If it does not exist, it creates one of size \mintinline{c}{LAZY_MAP_CAP_SIZE} and sets it to be the active one. 
+Then we map the page to the active capability at the provided offset. This means that in every step we carve out memory of the size of one page out of the active capability.
+In the end, we check if all memory of the capability has been mapped already and if so, we push back the active capability to become non-active. 
+
+\begin{figure}[ht]
+    \centering
+    \scalebox{0.7}{\includesvg{./figs/paging_bench_lazy.svg} }
+
+    \caption{Graph showing the allocation time of 128MB including touching each page, for different sizes of \mintinline{c}{LAZY_MAP_CAP_SIZE}. The memory was allocated by malloc which gives lazily mapped memory. This was run multiple times, but no noticeable difference could be observed, so we are only presenting the data of one run here.}
+    \label{fig:lazy_map}
+\end{figure}
+
+\subsubsection{Choice of \mintinline{c}{LAZY_MAP_CAP_SIZE} } 
+The size of  \mintinline{c}{LAZY_MAP_CAP_SIZE} will determine how often an RPC is called. 
+If it is set to the base page size, it will do an RPC call to the memory server for every single page that was lazily mapped and being accessed. 
+We identified this to be a bottleneck when allocating a big portion of memory with malloc and then accessing memory on every single page of it. 
+This is why we introduced the Mem Cap Store and set \mintinline{c}{LAZY_MAP_CAP_SIZE} to 128 pages such that only every 128 pages per lazily mapped region an RCP call to the memory server needs to be done. 
+This decision can be supported by the benchmarks in \ref{fig:lazy_map} we did for different sizes of \mintinline{c}{LAZY_MAP_CAP_SIZE} where the value 1 represents the base case of having done no optimization. 
+The graph shows that were to get a speedup of 18x (from 18s to 1s) by setting \mintinline{c}{LAZY_MAP_CAP_SIZE = 128 pages}. After that we don't observe any noticeable payoff and simply just start wasting memory.
+
+
+
+
+\subsection{Un-mapping of lazily mapped regions}
+
+Umapping a lazy mapped region works by just calling the normal unmap function. 
+It checks if the region was lazily mapped and finds the region size. We then iterate over our page table data structure in this region and unmap every mapping that we find (which could in theory be none). We also remove the region from the used list and tell the cap store to release all the Memory Capabilities used for this lazy mapping.
+
+\subsection{Detection Stack Overflows and Dynamic Stack Allocation}
+Since the stack is malloced and mapped lazily with a big region, this implicitly makes the stack dynamically grow with actual memory.
+To detect stack overflows the region type of the region is the important part here, we basically only differentiate between Stack Memory and Not Stack Memory. When allocating the stack for a thread, we specify the region type to be \mintinline{c}{REGION_TYPE_STACK}.
+In order to now identify stack overflows, we add the following code to the page fault handler:
+\begin{minted}{c}
+if (region_type == REGION_TYPE_STACK) {
+    if ((lvaddr_t)requested_addr < region_base + BASE_PAGE_SIZE) {
+        // We hit the guard page of the stack.
+        USER_PANIC("Stack overflow detected!\n");
+    }
+}
+\end{minted}
+This checks if are hitting the last page of the stack which acts as a "guard page" to detect stack overflows. This obviously does not work if the stack get directly overshoot by more than one page.
+
+
+\paragraph{Sidenote}
+We disabled the dynamic stack allocation one week before submission which also disables the stack overflow detection. This was done because we found an error in the design of this. When in disabled, the page fault handler is a different one which does not know about lazy mappings. This leads to the problem that when we enter disabled mode at the lowest stack address we have ever been to (in this thread), close to a page boundary, the code in disabled might just cause an unhandled page fault by calling a function and trying to put stuff on the stack. This took us 2 Days of debugging to find...... :( Please notify the future generations about this in advance.
+

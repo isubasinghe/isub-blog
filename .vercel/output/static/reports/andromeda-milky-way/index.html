@@ -1,0 +1,617 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>A Distributed-Memory Simulation of the Andromeda-Milky Way Collision</title><meta name="description" content="Parallelising the Barnes-Hut n-body algorithm with OpenMPI, including performance results from the Spartan HPC cloud."><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:1.25rem}.mspace.newline{margin-top:1.5rem}.wiki-link.broken{color:#b00020;text-decoration:underline dotted #b00020;cursor:help}.wiki-breadcrumbs{font-size:.95rem;margin-bottom:1rem;color:#555}.wiki-breadcrumbs a{font-size:.95rem}.wiki-children,.wiki-siblings,.wiki-backlinks{margin-top:2.5rem;border-top:1px solid #ddd;padding-top:1rem}.wiki-children h2,.wiki-siblings h2,.wiki-backlinks h2{font-size:1rem;color:#666;margin-bottom:.5rem;font-weight:400;text-transform:uppercase;letter-spacing:.05em}#wiki-graph{width:100%;height:70vh;border:1px solid #ddd;border-radius:4px}.container[data-astro-cid-37fxchfa]{max-width:56rem;margin:0 auto;margin-top:2rem;padding:0 1.5rem}
+a[data-astro-cid-g5kbnxd7]{text-decoration:none}
+</style>
+<link rel="stylesheet" href="/_astro/_slug_.BE7AxQzX.css"><script type="module" src="/_astro/page.DGRhADao.js"></script></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <div class="report-toolbar" data-astro-cid-6l5vyk3t> <a href="/reports" data-astro-cid-g5kbnxd7>&lt;</a>  <a class="source-link" href="https://github.com/isubasinghe/bhut" rel="external" data-astro-cid-6l5vyk3t>
+Source code ↗
+</a> </div> <div class="technical-report"><!-- Generated from reports/andromeda-milky-way/report.tex. Do not edit directly. -->
+<article aria-labelledby="technical-report-title" class="ltx_document ltx_authors_1line ltx_leqno">
+<h1 id="technical-report-title" class="ltx_title ltx_title_document">A Distributed-Memory Simulation of the Andromeda-Milky Way Collision</h1>
+<div class="ltx_authors">
+<span class="ltx_creator ltx_role_author">
+<span class="ltx_personname">Isitha Subasinghe
+</span><span class="ltx_author_notes">
+<span class="ltx_contact ltx_role_affiliation"><span class="ltx_text ltx_affiliation_institution">University of Melbourne</span><span class="ltx_text ltx_affiliation_city">Melbourne</span><span class="ltx_text ltx_affiliation_state">Victoria</span><span class="ltx_text ltx_affiliation_country">Australia</span>
+</span>
+<span class="ltx_contact ltx_role_email"><a href="mailto:isubasinghe@student.unimelb.edu.au">isubasinghe@student.unimelb.edu.au</a>
+</span></span></span>
+</div>
+
+<div class="ltx_abstract">
+<h6 class="ltx_title ltx_title_abstract">Abstract.</h6>
+<p class="ltx_p">In approximately 5 billion years <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib2" class="ltx_ref">14</a>]</cite>, our Milky Way galaxy and the distant Andromeda galaxy will be merged into the Andromeda-Milky Way galaxy. We explore how a simulation of this collision could be realised through the usage of OpenMPI<span id="footnote1" class="ltx_note ltx_role_footnote"><button type="button" class="ltx_note_mark" aria-label="Show footnote 1">1</button><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">1</sup><span class="ltx_tag ltx_tag_note">1</span>See <a href="https://www.open-mpi.org/" title="" class="ltx_ref ltx_url ltx_font_typewriter">https://www.open-mpi.org/</a></span></span></span> on the Spartan HPC cloud chimera <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib4" class="ltx_ref">12</a>]</cite> . The report explores how the Barnes-Hut <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib1" class="ltx_ref">1</a>]</cite> algorithm used for solving general n-body problems such as planetary body simulations could be trivially parallelised using distributed processing of the galaxies on an OpenMPI cluster. Our implementation of the Barnes-Hut algorithm over OpenMPI was able to offer a near linear speedup with respect to the number of processes used and offered a 41x speedup with 64 cores.</p>
+</div>
+<section id="S1" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">1. </span>Background</h2>
+
+<div id="S1.p1" class="ltx_para">
+<p class="ltx_p">The problem of solving general n-body problems is quite simple in some sense and has arguably been known for hundreds of years following Isaac Newtons formalisation of the law of universal gravitation despite not being able to solve n-body problems in terms of integrals for n <math id="S1.p1.m1" class="ltx_Math" alttext="\geq" display="inline"><mo>≥</mo></math> 3. The force exerted on an object <math id="S1.p1.m2" class="ltx_Math" alttext="j" display="inline"><mi>j</mi></math> by <math id="S1.p1.m3" class="ltx_Math" alttext="i" display="inline"><mi>i</mi></math> can be given through:</p>
+<table id="S1.E1" class="ltx_equation ltx_eqn_table">
+
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td rowspan="1" class="ltx_eqn_cell ltx_eqn_eqno ltx_align_middle ltx_align_left"><span class="ltx_tag ltx_tag_equation ltx_align_left">(1)</span></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="S1.E1.m1" class="ltx_Math" alttext="\mathbf{F}_{j,i}=-G\frac{m_{i}m_{j}}{\left|\mathbf{r}_{ji}\right|^{2}}\hat{%
+\mathbf{r}}_{ji}" display="block"><mrow><msub><mi>𝐅</mi><mrow><mi>j</mi><mo>,</mo><mi>i</mi></mrow></msub><mo>=</mo><mrow><mo>−</mo><mrow><mi>G</mi><mo>⁢</mo><mfrac><mrow><msub><mi>m</mi><mi>i</mi></msub><mo>⁢</mo><msub><mi>m</mi><mi>j</mi></msub></mrow><msup><mrow><mo>|</mo><msub><mi>𝐫</mi><mrow><mi>j</mi><mo>⁢</mo><mi>i</mi></mrow></msub><mo>|</mo></mrow><mn>2</mn></msup></mfrac><mo>⁢</mo><msub><mover accent="true"><mi>𝐫</mi><mo>^</mo></mover><mrow><mi>j</mi><mo>⁢</mo><mi>i</mi></mrow></msub></mrow></mrow></mrow></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<p class="ltx_p">where:</p>
+<table id="S1.Ex1" class="ltx_equation ltx_eqn_table">
+
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="S1.Ex1.m1" class="ltx_Math" alttext="\mathbf{r}_{ji}=\left|\mathbf{r}_{j}-\mathbf{r}_{i}\right|" display="block"><mrow><msub><mi>𝐫</mi><mrow><mi>j</mi><mo>⁢</mo><mi>i</mi></mrow></msub><mo>=</mo><mrow><mo>|</mo><mrow><msub><mi>𝐫</mi><mi>j</mi></msub><mo>−</mo><msub><mi>𝐫</mi><mi>i</mi></msub></mrow><mo>|</mo></mrow></mrow></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<table id="S1.Ex2" class="ltx_equation ltx_eqn_table">
+
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="S1.Ex2.m1" class="ltx_Math" alttext="G\text{ is the gravitational constant}" display="block"><mrow><mi>G</mi><mo>⁢</mo><mtext> is the gravitational constant</mtext></mrow></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<table id="S1.Ex3" class="ltx_equation ltx_eqn_table">
+
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="S1.Ex3.m1" class="ltx_Math" alttext="\hat{\mathbf{r}}_{ji}=\frac{\mathbf{r}_{j}-\mathbf{r}_{i}}{\left|\mathbf{r}_{j%
+}-\mathbf{r}_{i}\right|}" display="block"><mrow><msub><mover accent="true"><mi>𝐫</mi><mo>^</mo></mover><mrow><mi>j</mi><mo>⁢</mo><mi>i</mi></mrow></msub><mo>=</mo><mfrac><mrow><msub><mi>𝐫</mi><mi>j</mi></msub><mo>−</mo><msub><mi>𝐫</mi><mi>i</mi></msub></mrow><mrow><mo>|</mo><mrow><msub><mi>𝐫</mi><mi>j</mi></msub><mo>−</mo><msub><mi>𝐫</mi><mi>i</mi></msub></mrow><mo>|</mo></mrow></mfrac></mrow></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+<p class="ltx_p">Following this understanding of basic gravitational mechanics it becomes trivial to devise an exact computational technique for solving the planetary body simulation problem. Continuing from (<a href="#S1.E1" title="Equation 1 ‣ 1. Background ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">1</span></a>), we can derive the force a set of bodies may have on object <math id="S1.p1.m4" class="ltx_Math" alttext="j" display="inline"><mi>j</mi></math> by:</p>
+</div>
+<div id="S1.p2" class="ltx_para">
+<table id="S1.E2" class="ltx_equation ltx_eqn_table">
+
+<tbody><tr class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td rowspan="1" class="ltx_eqn_cell ltx_eqn_eqno ltx_align_middle ltx_align_left"><span class="ltx_tag ltx_tag_equation ltx_align_left">(2)</span></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_eqn_cell ltx_align_center"><math id="S1.E2.m1" class="ltx_Math" alttext="\mathbf{F_{j}}=\sum_{\begin{subarray}{c}i=0\\
+i\neq j\end{subarray}}^{n}-G\frac{m_{i}m_{j}}{\left|\mathbf{r}_{ji}\right|^{2}%
+}\hat{\mathbf{r}}_{ji}" display="block"><mrow><msub><mi>𝐅</mi><mi>𝐣</mi></msub><mo rspace="0.111em">=</mo><mrow><munderover><mo movablelimits="false" rspace="0em">∑</mo><mtable rowspacing="0pt"><mtr><mtd><mrow><mi>i</mi><mo>=</mo><mn>0</mn></mrow></mtd></mtr><mtr><mtd><mrow><mi>i</mi><mo>≠</mo><mi>j</mi></mrow></mtd></mtr></mtable><mi>n</mi></munderover><mo lspace="0em">−</mo><mrow><mi>G</mi><mo>⁢</mo><mfrac><mrow><msub><mi>m</mi><mi>i</mi></msub><mo>⁢</mo><msub><mi>m</mi><mi>j</mi></msub></mrow><msup><mrow><mo>|</mo><msub><mi>𝐫</mi><mrow><mi>j</mi><mo>⁢</mo><mi>i</mi></mrow></msub><mo>|</mo></mrow><mn>2</mn></msup></mfrac><mo>⁢</mo><msub><mover accent="true"><mi>𝐫</mi><mo>^</mo></mover><mrow><mi>j</mi><mo>⁢</mo><mi>i</mi></mrow></msub></mrow></mrow></mrow></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr></tbody>
+</table>
+</div>
+<div id="S1.p3" class="ltx_para">
+<p class="ltx_p">And from (<a href="#S1.E2" title="Equation 2 ‣ 1. Background ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">2</span></a>) we can finally derive the equation for updating the velocity and position of a particular body through:</p>
+<table id="S1.E3" class="ltx_equationgroup ltx_eqn_table">
+<tbody>
+<tr id="S1.E3X" class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td rowspan="2" class="ltx_eqn_cell ltx_eqn_eqno ltx_align_middle ltx_align_left"><span class="ltx_tag ltx_tag_equationgroup ltx_align_left">(3)</span></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_td ltx_eqn_cell"></td>
+<td class="ltx_td ltx_align_left ltx_eqn_cell"><math id="S1.E3X.m2" class="ltx_Math" alttext="\displaystyle\mathbf{v_{j}}^{\prime}=\mathbf{v_{j}}+\frac{\mathbf{F_{j}}}{m_{j%
+}}*\Delta t" display="inline"><mrow><mmultiscripts><mi>𝐯</mi><mi>𝐣</mi><mrow></mrow><mrow></mrow><mo>′</mo></mmultiscripts><mo>=</mo><mrow><msub><mi>𝐯</mi><mi>𝐣</mi></msub><mo>+</mo><mrow><mrow><mstyle displaystyle="true"><mfrac><msub><mi>𝐅</mi><mi>𝐣</mi></msub><msub><mi>m</mi><mi>j</mi></msub></mfrac></mstyle><mo lspace="0.222em" rspace="0.222em">∗</mo><mi mathvariant="normal">Δ</mi></mrow><mo>⁢</mo><mi>t</mi></mrow></mrow></mrow></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr>
+<tr id="S1.E3Xa" class="ltx_equation ltx_eqn_row ltx_align_baseline">
+<td class="ltx_eqn_cell ltx_eqn_center_padleft"></td>
+<td class="ltx_td ltx_eqn_cell"></td>
+<td class="ltx_td ltx_align_left ltx_eqn_cell"><math id="S1.E3Xa.m2" class="ltx_Math" alttext="\displaystyle\mathbf{r_{j}}^{\prime}=\mathbf{r_{j}}+\mathbf{v_{j}}*\Delta t" display="inline"><mrow><mmultiscripts><mi>𝐫</mi><mi>𝐣</mi><mrow></mrow><mrow></mrow><mo>′</mo></mmultiscripts><mo>=</mo><mrow><msub><mi>𝐫</mi><mi>𝐣</mi></msub><mo>+</mo><mrow><mrow><msub><mi>𝐯</mi><mi>𝐣</mi></msub><mo lspace="0.222em" rspace="0.222em">∗</mo><mi mathvariant="normal">Δ</mi></mrow><mo>⁢</mo><mi>t</mi></mrow></mrow></mrow></math></td>
+<td class="ltx_eqn_cell ltx_eqn_center_padright"></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="S1.p4" class="ltx_para">
+<p class="ltx_p">We can note that the runtime complexity of solving the planetary body simulation problem through (<a href="#S1.E3" title="Equation 3 ‣ 1. Background ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">3</span></a>) is <math id="S1.p4.m1" class="ltx_Math" alttext="\mathcal{O}(n^{2})" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><msup><mi>n</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></mrow></math> due to the need to compare every body with every other body in the system.
+With the large number of planetary bodies in the Milky-Way alone, it becomes obvious that this naive implementation is inadequate for the task of simulating the Andromeda-Milky Way collision. It is important to note that when simulating planetary bodies of this size over such a large time-span, the act of performing the simulation accurately and in a timely manner becomes an infeasible problem, therefore making sacrifices in accuracy for increased runtime performance is an acceptable outcome.
+The Barnes-Hut <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib1" class="ltx_ref">1</a>]</cite> algorithm introduced over 35 years ago, is among one of the most commonly used algorithms for solving general n-body problems such as planetary body simulations. The algorithm offers good performance characteristics with respect to the number of bodies it simulates, however its core advantage is the relative ease of parallelising the algorithm, these properties makes the Barnes-Hut algorithm ideal for our simulation of the Andromeda-Milky Way collision.</p>
+</div>
+</section>
+<section id="S2" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">2. </span>Related Work</h2>
+
+<div id="S2.p1" class="ltx_para">
+<p class="ltx_p">The Fast Multipole Method <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib3" class="ltx_ref">6</a>]</cite> was initially proposed to solve Gauss transforms in a performant yet accurate way but it still is capable of solving general n-body problems. The core advantage is the linear runtime <math id="S2.p1.m1" class="ltx_Math" alttext="\mathcal{O}(n)" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow></math> or more accurately <math id="S2.p1.m2" class="ltx_Math" alttext="\mathcal{O}(n*log(1/\epsilon))" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>n</mi><mo lspace="0.222em" rspace="0.222em">∗</mo><mi>l</mi></mrow><mo>⁢</mo><mi>o</mi><mo>⁢</mo><mi>g</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mrow><mn>1</mn><mo>/</mo><mi>ϵ</mi></mrow><mo stretchy="false">)</mo></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow></math> where <math id="S2.p1.m3" class="ltx_Math" alttext="\epsilon" display="inline"><mi>ϵ</mi></math> is the error tolerance. As a result of the mentioned time complexity, the Fast Multipole Method benefits when there is a large number of bodies to be simulated, however it is not obvious if the real performance characteristics favour FMM and unfortunately there is no mechanical process to determine what values of <math id="S2.p1.m4" class="ltx_Math" alttext="n" display="inline"><mi>n</mi></math> favour the Fast Multipole Method over other algorithms. Blelloch <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib5" class="ltx_ref">2</a>]</cite> explored the various differences in the algorithms for solving the general n-body problem, they observed that the Barnes-Hut algorithm can be significantly faster when the required accuracy required is low, even for extremely large planetary body simulations.</p>
+</div>
+<div id="S2.p2" class="ltx_para">
+<p class="ltx_p">There have been various attempts to use the high levels of parallelism introduced in modern GPUs, some of them have been to simply perform an <math id="S2.p2.m1" class="ltx_Math" alttext="\mathcal{O}(n^{2})" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><msup><mi>n</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></mrow></math> “all-pairs” calculation such as in <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib6" class="ltx_ref">13</a>]</cite>, quite surprisingly Nyland <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib6" class="ltx_ref">13</a>]</cite> was still able to offer a 50x speedup over the serial algorithm. Other researchers have explored as to how the Barnes-Hut algorithm could be implemented on a CUDA enabled GPU <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib7" class="ltx_ref">3</a>]</cite>. Interestingly Burtscher’s algorithm <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib7" class="ltx_ref">3</a>]</cite> was able to offer a 74x speedup with a 240 core GPU.</p>
+</div>
+<div id="S2.p3" class="ltx_para">
+<p class="ltx_p">A unique, specialised approach to solving the n-body problem was proposed initially by Ito called GRAvity-PipE (GRAPE-1) <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib9" class="ltx_ref">8</a>]</cite>, this approach was the development of a specialised computer (a co-processor) to perform the force calculations involved in the n-body problem, the result of using hardwired logic for the problem resulted in significant speedups. Following this initial research, there have been numerous and continuing improvements on this approach as shown by <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib10" class="ltx_ref">9</a>, <a href="#bib.bib11" class="ltx_ref">11</a>, <a href="#bib.bib12" class="ltx_ref">10</a>]</cite>.</p>
+</div>
+<section id="S2.SS1" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">2.1. </span>Parallel Algorithm</h3>
+
+<div id="S2.SS1.p1" class="ltx_para">
+<p class="ltx_p">The proposal for this idea derives from the fact that the tree building part of the Barnes-Hut algorithm is relatively simple and can be done in <math id="S2.SS1.p1.m1" class="ltx_Math" alttext="\mathcal{O}(n)" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow></math> time, which is significantly faster than the <math id="S2.SS1.p1.m2" class="ltx_Math" alttext="\mathcal{O}(n*log(n))" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>n</mi><mo lspace="0.222em" rspace="0.222em">∗</mo><mi>l</mi></mrow><mo>⁢</mo><mi>o</mi><mo>⁢</mo><mi>g</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo></mrow></mrow><mo stretchy="false">)</mo></mrow></mrow></math> runtime of the computation step. Initial performance testing in the development environment demonstrated that the construction step only took about 0.2% of total computation time in the worst case. The algorithm was quite a simple variation on the sequential algorithm, we simply limited the process from calculating the force for id numbers that were not in its assigned processing range. A simple ‘MPI_Allgatherv’ instruction was used to broadcast the updated velocities and positions. This load balancing was quite simple to perform yet it demonstrated exceptional performance characteristics.</p>
+</div>
+<div id="S2.SS1.p2" class="ltx_para">
+<p class="ltx_p">The parallel algorithm implemented did not make use of thread level parallelism via OpenMP <span id="footnote2" class="ltx_note ltx_role_footnote"><button type="button" class="ltx_note_mark" aria-label="Show footnote 2">2</button><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">2</sup><span class="ltx_tag ltx_tag_note">2</span>See <a href="https://www.openmp.org" title="" class="ltx_ref ltx_url ltx_font_typewriter">https://www.openmp.org</a></span></span></span> and instead opted for process level parallelism through OpenMPI. The justification for this is simply as a result of our initial testing that revealed that OctTree construction time dwarfs the runtime of the actual computation time. This made it obvious that a single threaded yet multi process implementation was a viable option, especially since we could avoid NUMA and cache related performance penalties.</p>
+</div>
+<section id="S2.SS1.SSS1" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">2.1.1. </span>Integration Method</h4>
+
+<div id="S2.SS1.SSS1.p1" class="ltx_para">
+<p class="ltx_p">The integration method used to solve the differential equation may have an significant effect on the accuracy of the simulation. Traditional algorithms used such as the Runge-Kutta method suffer from unbounded error. As the number of iterations of the simulation increase, it is possible that the error grows large enough such that the final result would not be an accurate simulation, this is especially important when simulating such a large time span. In order to solve this a symplectic integration technique was used called the Leapfrog method <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib15" class="ltx_ref">7</a>]</cite>. Leapfrog is symplectic, meaning that it is time reversible, this is an important characteristic as it means that this technique conserves the energy in the system to some bounded error.</p>
+</div>
+</section>
+<section id="S2.SS1.SSS2" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">2.1.2. </span>OctTree depth</h4>
+
+<div id="S2.SS1.SSS2.p1" class="ltx_para">
+<p class="ltx_p">OctTree depth has a significant impact on the runtime characteristics of the Barnes-Hut algorithm. This is ultimately as a result of how Barnes-Hut determines if an octant is worth computing exactly or not. From the algorithm for Barnes-Hut, note how <math id="S2.SS1.SSS2.p1.m1" class="ltx_Math" alttext="\theta" display="inline"><mi>θ</mi></math> (s/d) is calculated and checked to determine if an approximate centre of mass calculation should be used instead of an exact solution. Consider the case where we have a small maximum depth (<math id="S2.SS1.SSS2.p1.m2" class="ltx_Math" alttext="d_{s}" display="inline"><msub><mi>d</mi><mi>s</mi></msub></math>) to our OctTree, this means on average <math id="S2.SS1.SSS2.p1.m3" class="ltx_Math" alttext="s_{d_{s}}&gt;s_{d_{l}}" display="inline"><mrow><msub><mi>s</mi><msub><mi>d</mi><mi>s</mi></msub></msub><mo>&gt;</mo><msub><mi>s</mi><msub><mi>d</mi><mi>l</mi></msub></msub></mrow></math> where <math id="S2.SS1.SSS2.p1.m4" class="ltx_Math" alttext="d_{l}" display="inline"><msub><mi>d</mi><mi>l</mi></msub></math> indicates a larger OctTree depth, from this it is trivial to realise that <math id="S2.SS1.SSS2.p1.m5" class="ltx_Math" alttext="\theta_{s}&gt;\theta_{l}" display="inline"><mrow><msub><mi>θ</mi><mi>s</mi></msub><mo>&gt;</mo><msub><mi>θ</mi><mi>l</mi></msub></mrow></math>. This is an important recognition as having a smaller <math id="S2.SS1.SSS2.p1.m6" class="ltx_Math" alttext="\theta" display="inline"><mi>θ</mi></math> on average means that less octants will be computed exactly, leading to better performance characteristics. One more impact of the depth that we had to take into account for was the number of planets in a leaf octant, it is better for locality of reference that we have some contiguous data that we can trivially iterate over. Through experimental evaluation and taking the above considerations into account, an OctTree depth of 6 was established for the data used.</p>
+</div>
+</section>
+<section id="S2.SS1.SSS3" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">2.1.3. </span>Theta Tolerance</h4>
+
+<div id="S2.SS1.SSS3.p1" class="ltx_para">
+<p class="ltx_p">The tolerance level for the <math id="S2.SS1.SSS3.p1.m1" class="ltx_Math" alttext="\theta" display="inline"><mi>θ</mi></math> value also has a significant impact on the runtime performance of the algorithm. Consider the case where the maximum <math id="S2.SS1.SSS3.p1.m2" class="ltx_Math" alttext="\theta" display="inline"><mi>θ</mi></math> tolerance is capped at 0, the algorithm then simply degrades into an overly complicated <math id="S2.SS1.SSS3.p1.m3" class="ltx_Math" alttext="\mathcal{O}(n^{2})" display="inline"><mrow><mi class="ltx_font_mathcaligraphic">𝒪</mi><mo>⁢</mo><mrow><mo stretchy="false">(</mo><msup><mi>n</mi><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></mrow></math> “all-pairs” calculation. The <math id="S2.SS1.SSS3.p1.m4" class="ltx_Math" alttext="\theta" display="inline"><mi>θ</mi></math> value was determined through evaluation of papers such as <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib13" class="ltx_ref">15</a>]</cite> which showed that a <math id="S2.SS1.SSS3.p1.m5" class="ltx_Math" alttext="\theta" display="inline"><mi>θ</mi></math> value of 0.7-1.0 provided the best trade-off in terms of error and runtime.</p>
+</div>
+</section>
+<section id="S2.SS1.SSS4" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">2.1.4. </span>Compiler optimisations</h4>
+
+<div id="S2.SS1.SSS4.p1" class="ltx_para">
+<p class="ltx_p">Compiler optimisations were heavily used to further increase the performance of the algorithm and frequent profiling of the program was done via the linux utility “perf“ <span id="footnote3" class="ltx_note ltx_role_footnote"><button type="button" class="ltx_note_mark" aria-label="Show footnote 3">3</button><span class="ltx_note_outer"><span class="ltx_note_content"><sup class="ltx_note_mark">3</sup><span class="ltx_tag ltx_tag_note">3</span>See <a href="https://perf.wiki.kernel.org/index.php/Main_Page" title="" class="ltx_ref ltx_url ltx_font_typewriter">https://perf.wiki.kernel.org/index.php/Main_Page</a></span></span></span>. The standard library functions proved to be expensive in tight loops as a result of symbol lookup, static linking of the C++ standard library was performed in order to address this issue. Additional optimisation recommendations from <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib8" class="ltx_ref">5</a>]</cite> were evaluated and used where appropriate. A critical optimisation used was the “-march=native” flag passed onto the GNU compiler, this flag targets the exact architecture that we are compiling the program for, this results in further architecture level optimisations being possible such as usage of AVX-256.</p>
+</div>
+</section>
+</section>
+</section>
+<section id="S3" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">3. </span>Experiments</h2>
+
+<section id="S3.SS1" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.1. </span>Experiment Environment</h3>
+
+<div id="S3.SS1.p1" class="ltx_para">
+<p class="ltx_p">Two experimentation environments were used throughout the development process. The development environment was used as a quick way to test and filter out
+ideas that weren’t viable, while valid ideas were tested on the Spartan High Performance Computing cloud <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib4" class="ltx_ref">12</a>]</cite>.</p>
+</div>
+<section id="S3.SS1.SSS1" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">3.1.1. </span>Development Environment</h4>
+
+<div id="S3.SS1.SSS1.p1" class="ltx_para">
+<ul id="S3.I1" class="ltx_itemize">
+<li id="S3.I1.i1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i1.p1" class="ltx_para">
+<p class="ltx_p">CPU - AMD Ryzen™ 7 3700X @ 3.6-4.4GHz</p>
+</div>
+</li>
+<li id="S3.I1.i2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i2.p1" class="ltx_para">
+<p class="ltx_p">Memory - 32GB</p>
+</div>
+</li>
+<li id="S3.I1.i3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I1.i3.p1" class="ltx_para">
+<p class="ltx_p">Compiler - GNU 11.1.0</p>
+</div>
+</li>
+</ul>
+</div>
+</section>
+<section id="S3.SS1.SSS2" class="ltx_subsubsection">
+<h4 class="ltx_title ltx_title_subsubsection">
+<span class="ltx_tag ltx_tag_subsubsection">3.1.2. </span>Spartan Environment</h4>
+
+<div id="S3.SS1.SSS2.p1" class="ltx_para">
+<ul id="S3.I2" class="ltx_itemize">
+<li id="S3.I2.i1" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I2.i1.p1" class="ltx_para">
+<p class="ltx_p">CPU - Intel(R) Xeon(R) CPU E5-2698 v3 @ 2.30-3.6GHz</p>
+</div>
+</li>
+<li id="S3.I2.i2" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I2.i2.p1" class="ltx_para">
+<p class="ltx_p">Memory Per Processor - 2GB</p>
+</div>
+</li>
+<li id="S3.I2.i3" class="ltx_item" style="list-style-type:none;">
+<span class="ltx_tag ltx_tag_item">•</span> 
+<div id="S3.I2.i3.p1" class="ltx_para">
+<p class="ltx_p">Compiler - GNU 8.3.0</p>
+</div>
+</li>
+</ul>
+</div>
+</section>
+</section>
+<section id="S3.SS2" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.2. </span>Results</h3>
+
+<div id="S3.SS2.p1" class="ltx_para">
+<p class="ltx_p">The results were determined through running the Barnes-Hut algorithm for 30 iterations on the model B of Dubinski’s work <cite class="ltx_cite ltx_citemacro_citep">[<a href="#bib.bib14" class="ltx_ref">4</a>]</cite> and shown below. The data does not contain every star system in the two galaxies, in fact it is a much smaller representation at just 81,920 bodies. It is important to note that this simulation starts about 1 billion years from the collision, this is largely as a result of the initial 3-4 billion years being mostly of no consequence to us.</p>
+</div>
+<figure id="S3.F1" class="ltx_figure"><img src="/reports/andromeda-milky-way/runtime.png" id="S3.F1.g1" class="ltx_graphics ltx_centering ltx_img_landscape" width="384" height="288" alt="Runtime results for theta equal to 0.7" loading="lazy" decoding="async">
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Figure 1. </span>Results observed <math id="S3.F1.m2" class="ltx_Math" alttext="\theta=0.7" display="inline"><mrow><mi>θ</mi><mo>=</mo><mn>0.7</mn></mrow></math></figcaption>
+</figure>
+<figure id="S3.F2" class="ltx_figure"><img src="/reports/andromeda-milky-way/runtime_theta_1.png" id="S3.F2.g1" class="ltx_graphics ltx_centering ltx_img_landscape" width="384" height="288" alt="Runtime results for theta equal to 1.0" loading="lazy" decoding="async">
+<figcaption class="ltx_caption ltx_centering"><span class="ltx_tag ltx_tag_figure">Figure 2. </span>Results observed <math id="S3.F2.m2" class="ltx_Math" alttext="\theta=1.0" display="inline"><mrow><mi>θ</mi><mo>=</mo><mn>1.0</mn></mrow></math></figcaption>
+</figure>
+<figure id="S3.T1" class="ltx_table">
+<table class="ltx_tabular ltx_guessed_headers ltx_align_middle">
+<thead class="ltx_thead">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">Core(s)</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_r ltx_border_t">
+<math id="S3.T1.m1" class="ltx_Math" alttext="\theta=0.7" display="inline"><mrow><mi>θ</mi><mo>=</mo><mn>0.7</mn></mrow></math>, Time(s)</th>
+<th class="ltx_td ltx_align_center ltx_th ltx_th_column ltx_border_rr ltx_border_t">
+<math id="S3.T1.m2" class="ltx_Math" alttext="\theta=1.0" display="inline"><mrow><mi>θ</mi><mo>=</mo><mn>1.0</mn></mrow></math>, Time(s)</th>
+</tr>
+</thead>
+<tbody class="ltx_tbody">
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">8</th>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">993.142s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">884.421s</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">16</th>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">500.831s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">446.234s</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">24</th>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">347.724s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">318.101s</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_ll ltx_border_r ltx_border_t">32</th>
+<td class="ltx_td ltx_align_center ltx_border_r ltx_border_t">259.639s</td>
+<td class="ltx_td ltx_align_center ltx_border_rr ltx_border_t">237.971s</td>
+</tr>
+<tr class="ltx_tr">
+<th class="ltx_td ltx_align_center ltx_th ltx_th_row ltx_border_b ltx_border_ll ltx_border_r ltx_border_t">64</th>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_r ltx_border_t">142.153s</td>
+<td class="ltx_td ltx_align_center ltx_border_b ltx_border_rr ltx_border_t">120.661s</td>
+</tr>
+</tbody>
+</table>
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_table">Table 1. </span>Wall time per cores and <math id="S3.T1.m4" class="ltx_Math" alttext="\theta" display="inline"><mi>θ</mi></math> value</figcaption>
+</figure>
+<div class="ltx_pagination ltx_role_newpage"></div>
+</section>
+<section id="S3.SS3" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">3.3. </span>Discussion</h3>
+
+<div id="S3.SS3.p1" class="ltx_para">
+<p class="ltx_p"><span class="ltx_text ltx_font_bold">Note: </span> The sequential implementation was measured to have taken 5853.931s.</p>
+</div>
+<div id="S3.SS3.p2" class="ltx_para">
+<p class="ltx_p">Through <a href="#S3.T1" title="In 3.2. Results ‣ 3. Experiments ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">table</span> <span class="ltx_text ltx_ref_tag">1</span></a> we can see that the runtimes for the algorithm are quite similar with the lower and upper bounds for our acceptable <math id="S3.SS3.p2.m1" class="ltx_Math" alttext="\theta" display="inline"><mi>θ</mi></math> tolerance values that we determined earlier and therefore it makes sense to perform the full simulation with <math id="S3.SS3.p2.m2" class="ltx_Math" alttext="\theta=0.7" display="inline"><mrow><mi>θ</mi><mo>=</mo><mn>0.7</mn></mrow></math> as it will lead to a more accurate solution despite it being slightly slower.</p>
+</div>
+<div id="S3.SS3.p3" class="ltx_para">
+<p class="ltx_p">An obvious limitation of our approach is the lack of accounting for the black holes at the centre of the two galaxies. When the simulation nears completion it is likely that the two black holes at the centre of both these galaxies will have a non trivial implication on how the simulation is played out. Unfortunately, no attempt was made on accounting for these gravitational effects as a result of its reliance on Einstein’s theory of general relativity, while relativity can be simulated, it is much more difficult to do so than simple Newtonian mechanics.</p>
+</div>
+<div id="S3.SS3.p4" class="ltx_para">
+<p class="ltx_p">Unfortunately, it is likely that the 81,920 bodies approaches the largest problem size that we can simulate using this method in a timely manner, further work is required to determine how more bodies could be simulated.</p>
+</div>
+</section>
+</section>
+<section id="S4" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">4. </span>Further Work</h2>
+
+<section id="S4.SS1" class="ltx_subsection">
+<h3 class="ltx_title ltx_title_subsection">
+<span class="ltx_tag ltx_tag_subsection">4.1. </span>Simulating General Relativity</h3>
+
+<div id="S4.SS1.p1" class="ltx_para">
+<p class="ltx_p">As mentioned previously it could be beneficial to simulate Relativity instead of simple Newtonian based gravitation, solely as a result of the impacts of strong gravitation caused by the two black holes at the centre of both the Milky Way and the Andromeda galaxy.</p>
+</div>
+</section>
+</section>
+<section id="S5" class="ltx_section">
+<h2 class="ltx_title ltx_title_section">
+<span class="ltx_tag ltx_tag_section">5. </span>Conclusion</h2>
+
+<div id="S5.p1" class="ltx_para">
+<p class="ltx_p">We have demonstrated how OpenMPI may be used to simulate the gravitational mechanics of large n-body problems in an effective way. As shown previously we were able to gain significant reductions in runtime performance through our distributed processing strategy. The proposed algorithm was able to offer a 41x speedup with just 64 cores, reducing a runtime of nearly 100 minutes to about 2.5 minutes, making the timely simulation of Andromeda-Milky Way collision a feasible problem.</p>
+</div>
+</section>
+<section id="bib" class="ltx_bibliography">
+<h2 class="ltx_title ltx_title_bibliography">References</h2>
+
+<ul id="bib.L1" class="ltx_biblist">
+<li id="bib.bib1" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">J. Barnes and P. Hut (1986)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">A hierarchical o (n log n) force-calculation algorithm</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">nature</span> <span class="ltx_text ltx_bib_volume">324</span> (<span class="ltx_text ltx_bib_number">6096</span>), <span class="ltx_text ltx_bib_pages"> pp. 446–449</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <span class="ltx_ref ltx_ref_self"><span class="ltx_text ltx_ref_title">A Distributed-Memory Simulation of the Andromeda-Milky Way Collision</span></span>,
+<a href="#S1.p4" title="1. Background ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§1</span></a>.
+</span>
+</li>
+<li id="bib.bib5" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">G. Blelloch and G. Narlikar (1997)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">A practical comparison of tv-body algorithms</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Parallel Algorithms: Third DIMACS Implementation Challenge</span> <span class="ltx_text ltx_bib_volume">30</span>, <span class="ltx_text ltx_bib_pages"> pp. 81</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p1" title="2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib7" class="ltx_bibitem ltx_bib_incollection">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">M. Burtscher and K. Pingali (2011)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">An efficient cuda implementation of the tree-based barnes hut n-body algorithm</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">GPU computing Gems Emerald edition</span>,
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_pages"> pp. 75–92</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p2" title="2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib14" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">J. Dubinski, J. C. Mihos, and L. Hernquist (1995)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Using tidal tails to probe dark matter halos</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">arXiv preprint astro-ph/9509010</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S3.SS2.p1" title="3.2. Results ‣ 3. Experiments ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§3.2</span></a>.
+</span>
+</li>
+<li id="bib.bib8" class="ltx_bibitem ltx_bib_misc">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">A. Fog (2020)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Optimizing software in c++</span>.
+</span>
+<span class="ltx_bibblock"> <span class="ltx_text ltx_bib_publisher">Self-publishing</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.SS1.SSS4.p1" title="2.1.4. Compiler optimisations ‣ 2.1. Parallel Algorithm ‣ 2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1.4</span></a>.
+</span>
+</li>
+<li id="bib.bib3" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">L. Greengard and J. Strain (1991)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">The fast gauss transform</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">SIAM Journal on Scientific and Statistical Computing</span> <span class="ltx_text ltx_bib_volume">12</span> (<span class="ltx_text ltx_bib_number">1</span>), <span class="ltx_text ltx_bib_pages"> pp. 79–94</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p1" title="2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib15" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">A. Iserles (1986)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Generalized leapfrog methods</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">IMA Journal of Numerical Analysis</span> <span class="ltx_text ltx_bib_volume">6</span> (<span class="ltx_text ltx_bib_number">4</span>), <span class="ltx_text ltx_bib_pages"> pp. 381–392</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.SS1.SSS1.p1" title="2.1.1. Integration Method ‣ 2.1. Parallel Algorithm ‣ 2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1.1</span></a>.
+</span>
+</li>
+<li id="bib.bib9" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">T. Ito, J. Makino, T. Ebisuzaki, and D. Sugimoto (1990)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">A special-purpose n-body machine grape-1</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Computer Physics Communications</span> <span class="ltx_text ltx_bib_volume">60</span> (<span class="ltx_text ltx_bib_number">2</span>), <span class="ltx_text ltx_bib_pages"> pp. 187–194</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p3" title="2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib10" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">A. Kawai, T. Fukushige, J. Makino, and M. Taiji (2000)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Grape-5: a special-purpose computer for n-body simulations</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">Publications of the Astronomical Society of Japan</span> <span class="ltx_text ltx_bib_volume">52</span> (<span class="ltx_text ltx_bib_number">4</span>), <span class="ltx_text ltx_bib_pages"> pp. 659–676</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p3" title="2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib12" class="ltx_bibitem ltx_bib_inproceedings">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">J. Makino and H. Daisaka (2012)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">GRAPE-8–an accelerator for gravitational n-body simulation with 20.5 gflops/w performance</span>.
+</span>
+<span class="ltx_bibblock">In <span class="ltx_text ltx_bib_inbook">SC’12: Proceedings of the International Conference on High Performance Computing, Networking, Storage and Analysis</span>,
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_pages"> pp. 1–10</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p3" title="2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib11" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">J. Makino, M. Taiji, T. Ebisuzaki, and D. Sugimoto (1997)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Grape-4: a massively parallel special-purpose computer for collisional n-body simulations</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">The Astrophysical Journal</span> <span class="ltx_text ltx_bib_volume">480</span> (<span class="ltx_text ltx_bib_number">1</span>), <span class="ltx_text ltx_bib_pages"> pp. 432</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p3" title="2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib4" class="ltx_bibitem ltx_bib_misc">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">B. MEADE, L. LAFAYETTE, G. Sauter, and D. TOSELLO (2017)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Spartan hpc-cloud hybrid: delivering performance and flexibility</span>.
+</span>
+<span class="ltx_bibblock"> <span class="ltx_text ltx_bib_publisher">University of Melbourne</span>.
+</span>
+<span class="ltx_bibblock">External Links: <span class="ltx_text ltx_bib_links"><a href="https://melbourne.figshare.com/articles/online_resource/Spartan_HPC-Cloud_Hybrid_Delivering_Performance_and_Flexibility/4768291/1" title="" class="ltx_ref ltx_bib_external">Link</a>,
+<a href="https://dx.doi.org/10.4225/49/58ead90dceaaa" title="" class="ltx_ref doi ltx_bib_external">Document</a></span>
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <span class="ltx_ref ltx_ref_self"><span class="ltx_text ltx_ref_title">A Distributed-Memory Simulation of the Andromeda-Milky Way Collision</span></span>,
+<a href="#S3.SS1.p1" title="3.1. Experiment Environment ‣ 3. Experiments ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§3.1</span></a>.
+</span>
+</li>
+<li id="bib.bib6" class="ltx_bibitem ltx_bib_misc">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">L. Nylons, M. Harris, and J. Prins (2007)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Fast n-body simulation with cuda</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.p2" title="2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2</span></a>.
+</span>
+</li>
+<li id="bib.bib2" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">S. T. Sohn, J. Anderson, and R. P. Van der Marel (2012)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">The m31 velocity vector. i. hubble space telescope proper-motion measurements</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">The Astrophysical Journal</span> <span class="ltx_text ltx_bib_volume">753</span> (<span class="ltx_text ltx_bib_number">1</span>), <span class="ltx_text ltx_bib_pages"> pp. 7</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <span class="ltx_ref ltx_ref_self"><span class="ltx_text ltx_ref_title">A Distributed-Memory Simulation of the Andromeda-Milky Way Collision</span></span>.
+</span>
+</li>
+<li id="bib.bib13" class="ltx_bibitem ltx_bib_article">
+<span class="ltx_tag ltx_bib_author-year ltx_role_refnum ltx_tag_bibitem">L. Van Der Maaten (2013)</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_title">Barnes-hut-sne</span>.
+</span>
+<span class="ltx_bibblock"><span class="ltx_text ltx_bib_journal">arXiv preprint arXiv:1301.3342</span>.
+</span>
+<span class="ltx_bibblock ltx_bib_cited">Cited by: <a href="#S2.SS1.SSS3.p1" title="2.1.3. Theta Tolerance ‣ 2.1. Parallel Algorithm ‣ 2. Related Work ‣ A Distributed-Memory Simulation of the Andromeda-Milky Way Collision" class="ltx_ref"><span class="ltx_text ltx_ref_tag">§2.1.3</span></a>.
+</span>
+</li>
+</ul>
+</section>
+<section id="A1" class="ltx_appendix">
+<h2 class="ltx_title ltx_title_appendix">
+<span class="ltx_tag ltx_tag_appendix">Appendix A </span>Appendix</h2>
+
+<figure id="alg1" class="ltx_float ltx_float_algorithm ltx_framed ltx_framed_top">
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_float"><span class="ltx_text ltx_font_bold">Algorithm 1</span> </span> Computes the new velocities and positions after one iteration of Barnes-Hut</figcaption>
+<div class="ltx_listing ltx_listing">
+<div id="alg1.l1" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">1:</span></span><span class="ltx_text ltx_font_bold">procedure</span> <span class="ltx_text ltx_font_smallcaps">RunIteration</span>
+
+</div>
+<div id="alg1.l2" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">2:</span></span>     <math id="alg1.l2.m1" class="ltx_Math" alttext="\text{bodies}\leftarrow\text{planets in the system}" display="inline"><mrow><mtext>bodies</mtext><mo stretchy="false">←</mo><mtext>planets in the system</mtext></mrow></math>
+
+</div>
+<div id="alg1.l3" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">3:</span></span>     <math id="alg1.l3.m1" class="ltx_Math" alttext="root\leftarrow\textit{OctTree root}" display="inline"><mrow><mrow><mi>r</mi><mo>⁢</mo><mi>o</mi><mo>⁢</mo><mi>o</mi><mo>⁢</mo><mi>t</mi></mrow><mo stretchy="false">←</mo><mtext class="ltx_mathvariant_italic">OctTree root</mtext></mrow></math>
+
+</div>
+<div id="alg1.l4" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">4:</span></span>     <math id="alg1.l4.m1" class="ltx_Math" alttext="\text{rank}\leftarrow\text{rank of OpenMPI process}" display="inline"><mrow><mtext>rank</mtext><mo stretchy="false">←</mo><mtext>rank of OpenMPI process</mtext></mrow></math>
+
+</div>
+<div id="alg1.l5" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">5:</span></span>     <math id="alg1.l5.m1" class="ltx_Math" alttext="\text{chunkSize}\leftarrow\text{size of chunks}" display="inline"><mrow><mtext>chunkSize</mtext><mo stretchy="false">←</mo><mtext>size of chunks</mtext></mrow></math>
+
+</div>
+<div id="alg1.l6" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">6:</span></span>     <math id="alg1.l6.m1" class="ltx_Math" alttext="\text{size}\leftarrow\text{number of processes}" display="inline"><mrow><mtext>size</mtext><mo stretchy="false">←</mo><mtext>number of processes</mtext></mrow></math>
+
+</div>
+<div id="alg1.l7" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">7:</span></span>     <math id="alg1.l7.m1" class="ltx_Math" alttext="\text{n}\leftarrow\text{placeholder variable for number of planets}" display="inline"><mrow><mtext>n</mtext><mo stretchy="false">←</mo><mtext>placeholder variable for number of planets</mtext></mrow></math>
+
+</div>
+<div id="alg1.l8" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">8:</span></span>     <math id="alg1.l8.m1" class="ltx_Math" alttext="\text{lowerBound}\leftarrow\text{chunkSize*rank}" display="inline"><mrow><mtext>lowerBound</mtext><mo stretchy="false">←</mo><mtext>chunkSize*rank</mtext></mrow></math>
+
+</div>
+<div id="alg1.l9" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">9:</span></span>     <math id="alg1.l9.m1" class="ltx_Math" alttext="\text{upperBound}\leftarrow\text{chunkSize*(rank+1)}" display="inline"><mrow><mtext>upperBound</mtext><mo stretchy="false">←</mo><mtext>chunkSize*(rank+1)</mtext></mrow></math>
+
+</div>
+<div id="alg1.l10" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">10:</span></span>     <math id="alg1.l10.m1" class="ltx_Math" alttext="\text{newBodies}\leftarrow\text{array of new bodies generated after simulation}" display="inline"><mrow><mtext>newBodies</mtext><mo stretchy="false">←</mo><mtext>array of new bodies generated after simulation</mtext></mrow></math>
+
+</div>
+<div id="alg1.l11" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">11:</span></span>     <span class="ltx_text ltx_font_bold">for</span> <math id="alg1.l11.m1" class="ltx_Math" alttext="i\leftarrow 0,\ldots,n-1" display="inline"><mrow><mi>i</mi><mo stretchy="false">←</mo><mrow><mn>0</mn><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg1.l12" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">12:</span></span>         <span class="ltx_text ltx_font_bold">if</span> <math id="alg1.l12.m1" class="ltx_Math" alttext="\text{bodies[i].id}\geq\text{lowerBound}\land\text{bodies[i].id}&lt;\text{upperBound}" display="inline"><mrow><mtext>bodies[i].id</mtext><mo>≥</mo><mrow><mtext>lowerBound</mtext><mo>∧</mo><mtext>bodies[i].id</mtext></mrow><mo>&lt;</mo><mtext>upperBound</mtext></mrow></math> <span class="ltx_text ltx_font_bold">then</span>
+
+</div>
+<div id="alg1.l13" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">13:</span></span>              <math id="alg1.l13.m1" class="ltx_Math" alttext="\text{newBody}\leftarrow\text{simulateTimestep(root, bodies[i])}" display="inline"><mrow><mtext>newBody</mtext><mo stretchy="false">←</mo><mtext>simulateTimestep(root, bodies[i])</mtext></mrow></math>
+
+</div>
+<div id="alg1.l14" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">14:</span></span>              <span class="ltx_text ltx_markedasmath">newBodies.push(newBody)</span>
+              <span class="ltx_text ltx_font_bold">return </span> newBodies
+
+</div>
+</div>
+</figure>
+<figure id="alg2" class="ltx_float ltx_float_algorithm ltx_framed ltx_framed_top">
+<figcaption class="ltx_caption"><span class="ltx_tag ltx_tag_float"><span class="ltx_text ltx_font_bold">Algorithm 2</span> </span> Distributed processing of the Barnes-Hut algorithm</figcaption>
+<div class="ltx_listing ltx_listing">
+<div id="alg2.l1" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">1:</span></span><span class="ltx_text ltx_font_bold">procedure</span> <span class="ltx_text ltx_font_smallcaps">RunDistributedBhut</span>
+
+</div>
+<div id="alg2.l2" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">2:</span></span>     <math id="alg2.l2.m1" class="ltx_Math" alttext="\text{planets}\leftarrow\text{memory of where planets are to be held}" display="inline"><mrow><mtext>planets</mtext><mo stretchy="false">←</mo><mtext>memory of where planets are to be held</mtext></mrow></math>
+
+</div>
+<div id="alg2.l3" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">3:</span></span>     <math id="alg2.l3.m1" class="ltx_Math" alttext="\text{rank}\leftarrow\text{rank of OpenMPI process}" display="inline"><mrow><mtext>rank</mtext><mo stretchy="false">←</mo><mtext>rank of OpenMPI process</mtext></mrow></math>
+
+</div>
+<div id="alg2.l4" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">4:</span></span>     <math id="alg2.l4.m1" class="ltx_Math" alttext="\text{size}\leftarrow\text{number of processes}" display="inline"><mrow><mtext>size</mtext><mo stretchy="false">←</mo><mtext>number of processes</mtext></mrow></math>
+
+</div>
+<div id="alg2.l5" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">5:</span></span>     <math id="alg2.l5.m1" class="ltx_Math" alttext="\text{n}\leftarrow\text{placeholder variable for number of planets}" display="inline"><mrow><mtext>n</mtext><mo stretchy="false">←</mo><mtext>placeholder variable for number of planets</mtext></mrow></math>
+
+</div>
+<div id="alg2.l6" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">6:</span></span>     <math id="alg2.l6.m1" class="ltx_Math" alttext="\text{iters}\leftarrow\text{number of iterations to run}" display="inline"><mrow><mtext>iters</mtext><mo stretchy="false">←</mo><mtext>number of iterations to run</mtext></mrow></math>
+
+</div>
+<div id="alg2.l7" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">7:</span></span>     <span class="ltx_text ltx_font_bold">if</span> <math id="alg2.l7.m1" class="ltx_Math" alttext="\text{rank}=0" display="inline"><mrow><mtext>rank</mtext><mo>=</mo><mn>0</mn></mrow></math> <span class="ltx_text ltx_font_bold">then</span>
+
+</div>
+<div id="alg2.l8" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">8:</span></span>         <math id="alg2.l8.m1" class="ltx_Math" alttext="\text{planets}\leftarrow\text{ReadPlanets()}" display="inline"><mrow><mtext>planets</mtext><mo stretchy="false">←</mo><mtext>ReadPlanets()</mtext></mrow></math>
+
+</div>
+<div id="alg2.l9" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">9:</span></span>         <math id="alg2.l9.m1" class="ltx_Math" alttext="\text{n}\leftarrow\text{length(planets)}" display="inline"><mrow><mtext>n</mtext><mo stretchy="false">←</mo><mtext>length(planets)</mtext></mrow></math>
+     
+</div>
+<div id="alg2.l10" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">10:</span></span>     <span class="ltx_text ltx_markedasmath">Broadcast(n)</span>
+
+</div>
+<div id="alg2.l11" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">11:</span></span>     <span class="ltx_text ltx_markedasmath">Broadcast(planets)</span>
+
+</div>
+<div id="alg2.l12" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">12:</span></span>     <math id="alg2.l12.m1" class="ltx_Math" alttext="chunkSize\leftarrow(n/size)+(n\%size)" display="inline"><mrow><mrow><mi>c</mi><mo>⁢</mo><mi>h</mi><mo>⁢</mo><mi>u</mi><mo>⁢</mo><mi>n</mi><mo>⁢</mo><mi>k</mi><mo>⁢</mo><mi>S</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>z</mi><mo>⁢</mo><mi>e</mi></mrow><mo stretchy="false">←</mo><mrow><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>n</mi><mo>/</mo><mi>s</mi></mrow><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>z</mi><mo>⁢</mo><mi>e</mi></mrow><mo stretchy="false">)</mo></mrow><mo>+</mo><mrow><mo stretchy="false">(</mo><mrow><mrow><mi>n</mi><mo>%</mo></mrow><mo>⁢</mo><mi>s</mi><mo>⁢</mo><mi>i</mi><mo>⁢</mo><mi>z</mi><mo>⁢</mo><mi>e</mi></mrow><mo stretchy="false">)</mo></mrow></mrow></mrow></math>
+
+</div>
+<div id="alg2.l13" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">13:</span></span>     <span class="ltx_text ltx_font_bold">for</span> <math id="alg2.l13.m1" class="ltx_Math" alttext="i\leftarrow 0,\ldots,\text{iters}-1" display="inline"><mrow><mi>i</mi><mo stretchy="false">←</mo><mrow><mn>0</mn><mo>,</mo><mi mathvariant="normal">…</mi><mo>,</mo><mrow><mtext>iters</mtext><mo>−</mo><mn>1</mn></mrow></mrow></mrow></math> <span class="ltx_text ltx_font_bold">do</span>
+
+</div>
+<div id="alg2.l14" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">14:</span></span>         <math id="alg2.l14.m1" class="ltx_Math" alttext="\text{(origin, bounds)}\leftarrow\text{OctTreeInitParams(planets)}" display="inline"><mrow><mtext>(origin, bounds)</mtext><mo stretchy="false">←</mo><mtext>OctTreeInitParams(planets)</mtext></mrow></math>
+
+</div>
+<div id="alg2.l15" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">15:</span></span>         <math id="alg2.l15.m1" class="ltx_Math" alttext="\text{root}\leftarrow\text{NewOctTree(planets, origin, bounds)}" display="inline"><mrow><mtext>root</mtext><mo stretchy="false">←</mo><mtext>NewOctTree(planets, origin, bounds)</mtext></mrow></math>
+
+</div>
+<div id="alg2.l16" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">16:</span></span>         <math id="alg2.l16.m1" class="ltx_Math" alttext="\text{localPlanets}\leftarrow\text{RunIteration(planets, roots, chunkSize, %
+rank, size)}" display="inline"><mrow><mtext>localPlanets</mtext><mo stretchy="false">←</mo><mtext>RunIteration(planets, roots, chunkSize, rank, size)</mtext></mrow></math>
+
+</div>
+<div id="alg2.l17" class="ltx_listingline">
+<span class="ltx_tag ltx_tag_listingline"><span class="ltx_text" style="font-size:80%;">17:</span></span>         <span class="ltx_text ltx_markedasmath">Allgather(localPlanets, planets)</span>
+     
+</div>
+</div>
+</figure>
+<div class="ltx_pagination ltx_role_newpage"></div>
+</section>
+</article>
+</div>   </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>   

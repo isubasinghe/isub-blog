@@ -1,0 +1,265 @@
+\chapter{Nameservice}
+I want to preface this chapter with the fact that the naming I chose is a bit unfortunate. By "Nameserver" I mean a name resolution service. By Nameservice I mean a layer that glues together the name resolution and service binding.
+
+I went for a very simple solution where the Nameserver resolves a Service name (string) into a SID (Service ID). The SID uniquely identifies a service and can be used for routing capabilities through \mintinline{c}{init} because it encapsulates Core ID and Domain ID. In a DNS analogy the Service name is the domain name and SID is an IP.
+
+I didn't implement extra challenges, but instead revamped the LMP/UMP/RPC stack and provided support for my teammates who started using the Nameservice early on, implementing their feature requests and debugging if needed.
+
+\section{Connecting domains}
+The first part of the Nameservice functionality is to allow connecting client and service domains via an LMP/UMP backed RPC channel.
+
+\subsection{Existing work (ports)}
+As mentioned before in section \ref{sec:full_binding_ump}, we had an implementation of primitive "service binding" even before the individual projects started. Each service operated on a unique "port" (int) and clients could bind to it over UMP, even cross core.
+
+This required an extra routing table from ports to DIDs (Domain IDs) such that \mintinline{c}{init}s would know where to route the binding request. Later I show how I got rid of the ports to remove one indirection. This is because the Nameservice with the ports would have in total 3 indirections (Service name -> Port -> DID). I wanted to simplify this.
+
+\subsection{The need for sending capabilities}
+I wanted to connect intra-core client-service pairs via LMP and inter-core via UMP. UMP could be used for both cases, but even though I didn't benchmark this, LMP should be intuitively faster intra-core than UMP because sending messages intra-core is the LMP's very purpose.
+
+Supporting the LMP connection creating is easy because sending capabilities over LMP is already supported. The client, however, does not necessarily have an existing connection to the service. So in order to exchange the client-service endpoint capabilities, we need to route through a common node, e.g., core's \mintinline{c}{init}.
+
+For UMP, one endpoint (client) needs to allocate the frame for the channel and send it over to the other endpoint (service). One idea would be to just send frame information like base address and size, and forge it on the receiving end. However, only \mintinline{c}{init} can forge a capability.
+
+There are a few approaches for designing a binding scheme with support for sending capabilities as described above. The one I found the most simple is shown on the figure \ref{fig:ns_network}.  
+
+\begin{figure}[ht]
+    \centering
+        \scalebox{0.6}{\includesvg{./figs/ns_network.svg}}
+    \caption{The network design of sending capabilities for connection requests.}
+    \label{fig:ns_network}
+\end{figure}
+
+
+We see a \mintinline{c}{client} and \mintinline{c}{serviceA} on the same core 0. To connect to this service, the client sends its LMP endpoint over \mintinline{c}{init} to the \mintinline{c}{serviceA}. Afterward, this service finishes the binding via sending its remote connection, now directly to the client.
+
+For an inter-core of \mintinline{c}{client} to \mintinline{c}{serviceB}, the client allocates a frame to back the new UMP connection. Then they send it over to \mintinline{c}{serviceB} via core 0 \mintinline{c}{init} and core 1 \mintinline{c}{init}.
+
+There are two issues that need to be resolved. First, how does the \mintinline{c}{init} know over which channel to forward the capability. Second, the RPC channels from \mintinline{c}{init} to children domains don't exist yet. Remember that our RPC channels are unidirectional and the channels we set up on process spawn are from child to init.
+
+\subsection{Service ID}
+\label{sec:serviceid}
+For routing, we assign each service a unique SID (Service ID) which contains its Domain ID and Local Service ID. The Domain ID itself consists of Core ID and Local Domain ID\footnote{Now that I'm writing this, maybe I could've picked the names a bit better.}. How this this organized in memory is shown on figure \ref{fig:ns_serviceid}.
+\begin{figure}[ht]
+    \centering
+        \scalebox{0.6}{\includesvg{./figs/ns_serviceid.svg}}
+    \caption{The definition of \mintinline{c}{serviceid_t} type.}
+    \label{fig:ns_serviceid}
+\end{figure}
+
+The reason for not just using the Domain ID is that there can be multiple services in a single domain, hence Local Service ID.
+
+A shortend form of the SIDs with the Local Service ID omitted can be seen on figure \ref{fig:ns_network} under domain names. Now using SIDs in the requests as destinations, \mintinline{c}{init} will always know to which domain to forward the request.
+
+\subsection{\mintinline{c}{init} to domain channels}
+Whenever a service gets registered, the \mintinline{c}{init} needs to be able to forward requests to it. Therefore, I lazily (only on the first call of \mintinline{c}{nameservice_register()} from a domain) establish a connection to \mintinline{c}{init} via an RPC method \mintinline{c}{INIT_ESTABLISH_DOMAIN_SERVER}. The important caveat here is that before establishing this connection, I spawn a thread which listens on the default waitset to be able to accept the connection. There are definitely nicer ways around this, but refactoring it ended up being a TODO :)
+
+\subsection{A Route proto}.
+During the design my teammates kept asking me if they'll be able to send frame capabilities arbitrarily over the nameservice channels. So instead of making a simple \mintinline{c}{ServiceConnect} RPC with arguments like this:
+\begin{minted}{proto}
+message ServiceConnectRequest {
+  int64 destination_sid = 1;
+  
+  enum Type {
+    UMP = 0;
+    LMP = 1;
+  }
+  Type type = 2;
+}
+\end{minted}
+
+I created a generic \mintinline{c}{Route} RPC which can route arbitrary request over the \mintinline{c}{init}s, thus allowing to send/receive capabilities with any request over nameservice channel. The request gets always routed directly, unless the underlying channel is UMP and we're sending/receiving capabilities.
+\begin{minted}{proto}
+message RouteRequest {
+  uint64 destination_sid = 1;
+
+  RpcMethod method = 2;
+  RpcRequestWrap inner_request = 3;
+}
+\end{minted}
+
+Then for example for a \mintinline{c}{ServiceConnectRequest}, I put it into the \mintinline{c}{RouteRequest} and send it over. Note that the \mintinline{c}{ServiceConnectRequest} then doesn't need to contain the \mintinline{c}{destination_sid} because the layer above, \mintinline{c}{RouteRequest}, has it.
+
+\section{Avoiding deadlocks without async support}
+The "routing" looks nice on the diagrams, but in reality these are nested RPC calls... This means that if we're dispatching on a single \mintinline{c}{waitset} in \mintinline{c}{init}, a deadlock is always lurking around the corner. Imagine for example all RPC channels being registered on the same waitset in each  \mintinline{c}{init}. Then for example if two domains on different cores try to spawn a domain on each others cores, we likely get a deadlock because both inits will be already handling the request from the child and thus won't be able to serve the request from the other init. To get a better idea, this setup is also shown on figure \ref{fig:ns_deadlock}.
+
+\begin{figure}[ht]
+    \centering
+        \scalebox{0.7}{\includesvg{./figs/ns_deadlock.svg}}
+    \caption{A setup describing a deadlock situation when using a single dispatching thread with all channels registered on the same waitset.}
+    \label{fig:ns_deadlock}
+\end{figure}
+
+As described in the book, an ideal solution would be to support asynchronous execution, always accepting a request and being able to execute arbitrary amount of requests at the same time. However, that's a lot of work.
+
+For our simple case, to avoid deadlocks in case with no cyclic RPCs, it would actually suffice to have a separate waitset for each core channel and an extra separate waitset for the children to init channels. For 4 cores, this would mean 5 waitsets and we'd dispatch on 5 threads. I do not provide a formal proof for why this would be enough, mostly I just convinced myself drawing diagrams on a piece of paper.
+
+However, in the actual implementation we just register everything on the default waitset (except for the Memory server) and dispatch on multiple threads. It's one of these things that just worked out of the box so I never got to change it in the end because I preempted for other problems.
+
+\section{Nameserver}
+Now that we can successfully connect client and services, we just need to add a layer which resolves Service names to Service IDs.
+
+\subsection{It's just a list of [name, sid] pairs}
+In the actual implementation, a Nameserver (\mintinline{c}{usr/nameserver/main.c}) is a service named "nameserver" with the following interface:
+\begin{minted}{proto}
+enum RpcMethod {
+      NS_LOOKUP = 0;
+      NS_REGISTER = 1;
+      NS_ENUMERATE = 2;
+      NS_DEREGISTER = 3;
+}
+
+message ServiceInfo {
+  string name = 1;
+  uint64 sid = 2;
+}
+
+message NsRegisterRequest {
+  ServiceInfo service = 1;
+}
+
+message NsLookupRequest {
+  string name = 1;
+}
+
+message NsLookupResponse {
+  uint64 sid = 1;
+}
+
+// Enumerate and Deregister omitted for breviy.
+\end{minted}
+
+When the Nameserver receives a Register request, it checks if a service with the given name already exists. If yes, an error is returned, otherwise the service gets registered. Registering a service just appends it to an internal \mintinline{c}{collections_listnode}. We do not check whether the request is coming from a "credible" source, i.e., if the DID of the caller corresponds to the DID found in the SID of the request. 
+
+Similarly, a lookup just takes a name, goes through the list of registered services, and if a hit is found returns the corresponding SID. I omit describing Deregister and Enumerate because there's also nothing surprising there.
+
+\section{Connecting domains + Nameserver = Nameservice}
+Now putting it all together, the \mintinline{c}{nameservice_register()} triggers a Register RPC to the Nameserver and if it's the first service being registered in the domain, establishes init to domain RPC channel.
+
+Similarly, \mintinline{c}{nameservice_lookup()} first triggers a Lookup RPC to the Nameserver and retrieves the SID. Next we send a Route request encapsulating a ServiceConnect request to the init which routes it to the correct destination domain based on the SID retrieved from the Nameserver. One important detail is that each service implements an opaque "Service" interface in order to support accepting connections. In the actual code this is achieved via an indirection\footnote{As everything in Computer Science is :)}, by the "Service" interface handler calling the actual handler provided by the user.
+
+\subsection{Bootstrapping the Nameserver}
+An interesting problem is how to bootstrap the Nameserver such that all domains including init can connect to it and then use it as just any other nameservice channel. The problem is that at the time the Nameserver is trying to \mintinline{c}{nameservice_register()} itself, there's no Nameserver. And similarly, when clients are first trying to connect to the Nameserver via \mintinline{c}{nameservice_lookup()}, there's no connection to Nameserver to resolve the name.
+
+Therefore, I just take inspiration from the traditional networks and give our Nameserver a fixed SID. Namely it's the first domain spawned after init on core 0, thus having the SID 0.1.0. Therefore, the first thing a Nameserver does after spawning is add itself to the records. This solves the Nameserver registering problem.
+
+Now for the Nameserver lookup, the fixed SID also solves this problem because now we can just directly connect to a well-known fixed SID of the Nameserver with no need for a Nameserver lookup. We do this as part of the process-spawning. So when process's \mintinline{c}{main()} is entered, the connection to the Nameserver is already established. 
+
+\subsection{The API with Protobuf support}
+I had to add a few new interfaces in order to allow the Protobuf support. I omit them for brevity as they're just mere wrappers over the RPC interface already seen in \autoref{sec:rpc}. What I want to show though is how I "backsupport" the original API that we had to implement.
+
+\subsection{Raw bytes API}
+Recall the API for the \mintinline{c}{nameservice_rpc()} from the handout:
+\begin{minted}{c}
+errval_t nameservice_rpc(nameservice_chan_t chan, void *message, size_t bytes,
+                         void **response, size_t *response_bytes, struct capref tx_cap,
+                         struct capref rx_cap);
+\end{minted}
+
+To support this over protos, I created a \mintinline{c}{ServiceBytes} RPC method which wraps the user-provided buffer and then sens it over the Protobuf RPC interface.
+\begin{minted}{proto}
+message ServiceBytesRequest {
+  bytes raw_bytes = 1;
+}
+
+message ServiceBytesResponse {
+  bytes raw_bytes = 1;
+}
+\end{minted}
+
+This incurs an extra memory copy due to how the underlying RPC layer is implemented, but as discussed before it could be optimized away (see \autoref{sec:rpc_proto_opt}).
+
+\subsection{Shortcomings of using \mintinline{c}{void *} as an opaque type}
+In order to hide the underlying nameservice channel type, the provided interface uses a simple typedef of \mintinline{c}{void *}.
+\begin{minted}{c}
+// nameserver.h
+typedef struct void *nameservice_chan_t;
+
+errval_t nameservice_rpc(nameservice_chan_t chan, void *message, size_t bytes,
+                         void **response, size_t *response_bytes, struct capref tx_cap,
+                         struct capref rx_cap);
+// shell.c
+nameservice_chan_t chan;
+// WRONG, but compiles.
+errval_t err = nameservice_rpc(&chan, ...); 
+\end{minted}
+As the snippet above shows, it's very easy to mess up without the compiler complaining. This is what one of my teammates encountered early on, following the standard C mantra of defining local variable on stack and then passing down a pointer to it to get it filled with data. However, the \mintinline{c}{chan} here already is a pointer.
+
+So after hunting down this bug I changed the opaque interface to use a forward declaration like this:
+\mintinline{c}{void *}.
+\begin{minted}{c}
+// nameserver.h
+typedef struct nameservice_chan *nameservice_chan_t;
+
+// shell.c
+nameservice_chan_t chan;
+// WRONG, but doesn't compile :)
+errval_t err = nameservice_rpc(&chan, ...); 
+\end{minted}
+
+\section{Benchmarks}
+\begin{figure}[ht]
+    \centering
+         \subfloat[\centering ]{{\scalebox{0.35}{\includesvg{./figs/ns_register.svg} }}}
+         \subfloat[\centering ]{{\scalebox{0.35}{\includesvg{./figs/ns_lookup.svg} }}}
+
+    \caption{Graphs showing performance of the Nameservice. The Nameserver always runs on  core 0. For UMP, the service runs on core 3 and client on core 2. For LMP, both server and client run on core 0.}
+    \label{fig:ns_bench}
+\end{figure}
+
+As can be seen on the benchmarks, \mintinline{c}{nameservice_register()} latency is in order of microseconds. This is nice, but I really don't understand why since in the RPC benchmarks we observed that RPCs were weirdly slow. Also LMP register is slower than UMP which is in line with the results we observed in the LMP and UMP chapters.
+
+The \mintinline{c}{nameservice_lookup()} latency is roughly 1000x slower than registering. This is more aligned with the observed slowness of RPCs :) Also there's a lot of nested RPCs happening, for example in the UMP case where client from core 2 is connecting to service on core 3, there needs to be 3 RPCs (nested).
+
+Overall, the performance was enough to make the system usable, but it didn't spark joy. The design did, though.
+
+\section{Shell commands and required functionality}
+I implemented the commands \mintinline{c}{nslist} and \mintinline{c}{nslookup <prefix>}. Here's a sample output:
+\begin{minted}{shell}
+$> nslist
+#  Name                SID
+1  net-socket-servers  0.4.0
+2  FS/sdcard           0.3.0
+3  terminal            0.2.0
+4  nameserver          0.1.0
+
+$> nslookup nameserver
+#  Name                SID
+1  nameserver          0.1.0
+
+$> nslookup n
+#  Name                SID
+1  net-socket-servers  0.4.0
+2  nameserver          0.1.0
+\end{minted}
+
+The \mintinline{c}{nslookup <prefix>} returns all services with a matching prefix rather than an exact match. It's a deviation from the required interface, but a small one and I find it more useful.
+
+Additionally, I changed the interface of \mintinline{c}{nameservice_enumerate()} as follows:
+\begin{minted}{c}
+// old
+errval_t nameservice_enumerate(char *query, size_t *num, char **result);
+// new
+errval_t nameservice_enumerate(char *query, size_t *num, char ***result);
+\end{minted}
+I didn't know what to do with the \mintinline{c}{char **result} -- return a comma separated list? But then what's the use of the \mintinline{c}{num}. Or perhaps \mintinline{c}{"\0"} separated list? But then the parsing for the user would be small olympics in indexing. So I just changed it to return an array of chars.
+
+\section{Adoption of the Nameservice}
+I tried to implement the Nameservice early and promised good features to make my teammates use it. Except for a few initial hurdles, it was well adopted and all other individual projects use it under the hood. The memory server doesn't use it and it would be non-trivial to make this work since:
+\begin{itemize}
+    \item To add the Memory server the Nameserver needs to be running.
+    \item To make the Nameserver running, the Memory server needs to be up.
+\end{itemize}
+This loop can of course be broken, but we didn't even have Memory server running in a separate domain.
+
+Moreover, I also didn't turn \mintinline{c}{init} RPC server into a service. This would've been much simpler than in the case of Memory server, but I just didn't see the appeal in it because the refactor wouldn't really help anyone.
+
+Overall, it was great to see everyone from the team build up on this and not have many bugs/complaints :P
+
+\section{Revisiting LMP/UMP/RPC stack}
+As mentioned in the beginning, I didn't implement any of the extra challenges because there was basically no use case for them by anyone. Instead, I revamped the LMP/UMP/RPC stack, optimizing LMP, cleaning up UMP, and adding Protobuf support to RPC. 
+
+\begin{hindsight}
+Looking back, I'm happy with the overall design of the Nameservice and the implementation. There was a running joke in our team that whenever we implemented a new layer like paging or threading, calling its functions would always take an emotional toll because we couldn't trust it. For the Nameservice, the switch from "omg I'm scared to use it" to "I doubt the issue is in the RPC stack" was relatively fast. Although there were some sleepless debugging sessions in between.
+
+One thing I regret is not benchmarking sooner to have a buffer of time for optimizations.
+\end{hindsight}

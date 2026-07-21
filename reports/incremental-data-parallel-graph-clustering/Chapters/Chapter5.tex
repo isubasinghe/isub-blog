@@ -1,0 +1,104 @@
+\chapter{Results \& Discussion}
+
+
+\section{Results}
+
+\subsection{Batch Processing of graphs}
+Here we explore the different results obtained for batch processing of graph data using Apache Spark and Differential Dataflow.
+\subsubsection{Apache Spark}
+\begin{table}[!h]
+    \centering
+    \resizebox{\columnwidth}{!}{%
+    \begin{tabular}{||c|c|c|c|c||}
+        \hline
+           Dataset     & Nodes  & Edges  & Time  & Modularity \\ \hline
+        \text{AS-733}  & 6474   &   13895   &  18.331s &  0.478 \\ 
+        \hline
+        \text{Amazon}  & 334863 &   925872  &  49.869s &  0.621 \\
+        \hline
+        \text{email-Eu-core} & 1005 &  12.655s  & 12.656s &  0.412 \\
+        \hline
+        \text{Wikipedia-Crocodile} & 11631 &  170918   & 37.470s &  0.657 \\
+        \hline
+        \text{Wikipedia-Chameleon} & 2277  &  31421  & 13.582s &  0.663 \\
+        \hline
+        \text{Wikipedia-Squirrel} & 5201 &  198493  & 26.122s &  0.397 \\
+        \hline
+        \text{Malaria-HVR\_3} & 36 &  418  & 1.137s & 0.0713 \\
+        \hline
+    \end{tabular}%
+    }
+    \label{table:results_batch}
+    \caption{Results from batch processing of the various datasets using Apache Spark}
+\end{table}
+
+\subsubsection{Differential Dataflow}
+\begin{table}[H]
+    \centering
+    \resizebox{\columnwidth}{!}{%
+    \begin{tabular}{||c|c|c|c|c||}
+        \hline
+           Dataset     & Nodes  & Edges  & Time  & Modularity \\ \hline
+        \text{AS-733}  & 6474   &   13895   &  0.367s &  0.786 \\ 
+        \hline
+        \text{Amazon}  & 334863 &   925872  &  16.230s &  0.421 \\
+        \hline
+        \text{email-Eu-core} & 1005 &  25571  & 0.378s &  0.727 \\
+        \hline
+        \text{Wikipedia-Crocodile} & 11631 & 170918 & 2.624s   & 0.619  \\
+        \hline
+        \text{Wikipedia-Chameleon} & 2277  & 31421 & 2.051s  & 0.675  \\
+        \hline
+        \text{Wikipedia-Squirrel} & 5201 &  198493 & 2.220s  & 0.621 \\
+        \hline
+        \text{Malaria-HVR\_3} & 36 &  418  & 0.001076s & 0.986 \\
+        \hline
+    \end{tabular}%
+    }
+    \label{table:results_dd}
+    \caption{Results from batch processing of the various datasets using Differential Dataflow}
+\end{table}
+
+\subsection{Cost of Single Insert}
+We now would like to measure the cost of a single insert in an already clustered graph, we can simply measure this through evaluating the time taken for a computation to stabilise after an edge pair is inserted to an already clustered graph (to a single iteration). The given table shows the performance for the initial graph clustering and also the cost of a single insertion. 
+\begin{table}[H]
+    \centering
+    \resizebox{\columnwidth}{!}{%
+    \begin{tabular}{||c|c|c|c|c||}
+        \hline
+           Dataset     & Nodes  & Edges  & Single Iteration Batch Processing time & Incremental Adjustment time \\ \hline
+        \text{AS-733}  & 6474   &   13895   &  0.0027s &  0.0019s \\ 
+        \hline
+        \text{Amazon}  & 334863 &   925872  &  1.143s &  0.778s \\
+        \hline
+        \text{email-Eu-core} & 1005 &  25571  & 0.0023s &  0.000986s \\
+        \hline
+        \text{Wikipedia-Crocodile} & 11631 & 170918 & 0.163s   & 0.093s  \\
+        \hline
+        \text{Wikipedia-Chameleon} & 2277  & 31421 & 0.035s & 0.019s  \\
+        \hline
+        \text{Wikipedia-Squirrel} & 5201 &  198493 & 0.196s  & 0.092s \\
+        \hline
+        \text{Malaria-HVR\_3} & 36 &  418  & 0.001052s & 0.0001747s \\
+        \hline
+    \end{tabular}%
+    }
+    \label{table:results_dd_insertions}
+    \caption{Result from single edge insertion with Differential Dataflow}
+\end{table}
+
+\section{Discussion}
+As shown in \cref{table:results_batch} and \cref{table:results_dd}, Differential Dataflow was able to obtain significant speedups over the Apache Spark based version, not only was it able to offer significant speedups, it was also somewhat better than the Apache Spark implementation when it came to the overall modularity as well. Ultimately, this demonstrated that the ability to avoid performing computations where possible through the use of Differential Dataflow will eventually lead to bigger performance gains for most graphs, this may not always be the case and that scenario is discussed in further detail in \cref{section:graph_stability}. 
+
+\subsection{Modularity}
+The usage of Differential Dataflow and to be more precise the result of parallelising Louvain in the manner described previously did not for the most part have a significant impact on the modularity value. Although Differential Dataflow did demonstrate a somewhat lower modularity value for the Amazon product co-purchasing network. One possible explanation for this is that these communities aren't always well defined and can jump from categories quite easily, however, this still wouldn't explain why the Apache Spark implementation was able to offer a near 50\% increase in modularity. It is important to note still that the Differential Dataflow based method was still able to offer a better modularity for five out of the seven graph datasets, showing that a Louvain method based on Differential Dataflow is effective. 
+
+\subsection{Graph Stability}
+\label{section:graph_stability}
+From our results, it seems that there is a certain property of the graphs that seem to impact the overall stability of both the time to terminate and in some cases the modularity itself. Consider for example the AS-733, email-Eu-core and Malaria-HVR\_3 datasets which stabilised and terminated competely by themselves without our non-termination prevention technique coming into play. In the case of email-Eu-core, it is not too dissimilar to Wikipedia-Chameleon, in this case we observe that Wikipedia-Chameleon takes about two seconds compared to the fast 378ms runtime of the email-Eu-core graph, while Wikipedia-Chameleon is a bigger dataset, it is not \textit{significantly} bigger than email-Eu-core, this can be shown in more perspective through contrasting the runtime and size of the Wikipedia-Squirrel dataset with Wikipedia-Chameleon. It is difficult to make a claim regarding what property of a graph is responsible for the stability of the communities, however, one likely heuristic that \textit{could} be used to determine the graph stability is the edge to node ratio, we would like to make the speculation that a higher edge to node ratio generally reduces the probability of an unstable graph community structure but further research is needed here to provide evidence for this conjecture. 
+
+\subsection{Domino Effect}
+Unfortunately, one potential pitfall of using Differential Dataflow for the Louvain method is the degradation in performance when the advantages of using Differential Dataflow are not present and our implementation degrades to a slower version of the same algorithm due to us paying the runtime costs of Differential Dataflow. This occurs when there is a large domino effect due to a change in the classification of a vertex, simply put this change may induce another change which may induce another and so on. This is ultimately related to the Graph Stability mentioned in \cref{section:graph_stability}. This is difficult to prevent as it is difficult to determine if these induced changes contributed to increasing the modularity of our graph in a meaningful way or not. 
+
+\subsection{Usage in real-time systems}
+From the above results, a Differential Dataflow based Louvain method may be appropriate for some usage in real-time systems for some graph structures, but there may be some graph that has highly unstable community structures which would cause a Differential Dataflow based Louvain method to be far slower than ideal, perhaps even slower than a sequential non-incremental version. Further investigation here is warranted to investigate how to determine what exactly determines the stability properties of a graph's community structure. 

@@ -1,0 +1,274 @@
+\chapter{RPC}
+\label{sec:rpc}
+
+The LMP and UMP channels described in previous chapters can send arbitrary-sized messages and capabilities. Next, to build a basic RPC layer we need to:
+\begin{enumerate}
+    \item \emph{Abstract} away the two types of channels.
+    \item \emph{Marshall} basic types (int, string, \ldots).
+    \item Provide a framework for callers (clients) to call and for callees (servers) to handle the RPCs.
+\end{enumerate}
+
+We did not create a separate layer for the abstraction above the LMP and UMP channels, it is done inside \mintinline{c}{struct aos_rpc}. We also did not create separate structs for client and server, but \mintinline{c}{struct aos_rpc} can be initialized either as client or as a server.
+
+\begin{minted}{c}
+struct aos_rpc {
+    enum aos_rpc_chan_type chan_type;
+
+    union {
+        struct lmp_chan lmp;
+        struct ump_chan ump;
+    } chan;
+
+    // Mutex ensuring that at any point there's only at most one open rpc call.
+    struct thread_mutex mutex;
+
+    // Server-specific.
+    struct waitset *ws;
+    aos_rpc_eventhandler_t *eventhandler;
+    void *server_state;
+};
+
+
+errval_t aos_rpc_init_lmp_server(struct aos_rpc *rpc, struct waitset *waitset,
+                                 aos_rpc_eventhandler_t eventhandler, void *server_state);
+
+errval_t aos_rpc_establish_lmp_client(struct aos_rpc *rpc, struct capref remote_ep);
+
+errval_t aos_rpc_init_ump_server(struct aos_rpc *rpc, void *buf, size_t buflen,
+                                 struct waitset *waitset,
+                                 aos_rpc_eventhandler_t eventhandler, void *server_state);
+
+void aos_rpc_init_ump_client(struct aos_rpc *rpc, void *buf, size_t buflen);
+\end{minted}
+
+A server registers with an eventhandler which is then called from the \mintinline{c}{event_dispatch(rpc->ws)}. Initially, there was no indirection and the user-provided eventhandler was the one directly registered with the \mintinline{c}{waitset}. Once we introduced Protobufs we also added an indirection to the eventhandler.
+What follows is our RPC journey.
+
+\section{Initial design}
+At first we implemented a protocol more general than RPC. With RPC, a caller typically sends one message as a request and gets one message back as a response. Instead, we allowed arbitrary amount of messages between the client (caller) and server (callee).
+This was because we didn't have a way of marshalling a full request/response, consisting of multiple arguments, into a single bytestream. So we could send an int, a string, etc, but only as separate messages.
+
+Below code shows a \emph{very} simplified version of our initial designed (e.g., no error handling). It is the process-spawning RPC call.
+
+\begin{minted}{c}
+errval_t aos_rpc_process_spawn(struct aos_rpc *rpc, char *cmdline,
+                               coreid_t core, domainid_t *newdid) {
+    thread_mutex_lock(&rpc->mutex);
+    
+    // Send method.
+    aos_rpc_send_method(rpc, AOS_RPC_METHOD_PROCESS_SPAWN);
+    
+    // Send arguments.
+    aos_rpc_send_number(rpc, core);
+    aos_rpc_send_string(rpc, cmdline);
+    
+    // Receive response.
+    aos_rpc_recv_number(rpc, newdid);
+
+    thread_mutex_unlock(&rpc->mutex);
+}
+
+errval_t aos_rpc_eventhandler(void *args) {
+    struct aos_rpc *rpc = (struct aos_rpc *)args;
+    thread_mutex_lock(&rpc->mutex);
+        
+    // Receive method.
+    enum rpc_method;
+    aos_rpc_recv_method(rpc, &rpc_method);
+    
+    switch (rpc_method) {
+    case AOS_RPC_METHOD_PROCESS_SPAWN:
+    {
+        // Receive arguments.
+        int core;
+        char *cmdline;
+        aos_rpc_recv_number(rpc, &core);
+        aos_rpc_recv_string(rpc, &cmdline);
+        
+        // Send response.
+        int newdid = handle_process_spawn(core, cmdline);
+        aos_rpc_send_number(rpc, newdid);
+    }
+    break;
+    }
+    
+    thread_mutex_unlock(&rpc->mutex);
+}
+\end{minted}
+
+Funcionality-wise, this approach suffices for all use cases of this course. What's about to be shown in the rest of this chapter is basically us going on a great tangent :) However, a fun one, pinkie promise!
+
+We didn't like two things about our initial design:
+\begin{enumerate}
+    \item For LMP, each \mintinline{c}{aos_rpc_send_*()} means a context switch to the receiving domain.
+    \item The glue code for sending/receiving is error-prone and tedious to write.
+\end{enumerate}
+
+The first problem means quite a slowdown as we've seen in the benchmarks for LMP without SYNC optimization (\autoref{sec:lmp_sync_and_buf}). To remedy this, we could add a \mintinline{c}{should_sync} flag to each \mintinline{c}{aos_rpc_send_*()} or have a \mintinline{c}{aos_rpc_send_sync()} call that would SYNC and the rest of the calls would not. However, these solutions did not spark a lot of joy for us. The underlying issue really is that we can't marshall all arguments into one continuous message. In the next subsections we'll see how we, in our opinion very successfully, solved this by using Protobufs.
+
+The issue of tedious glue code where each RPC call like \mintinline{c}{aos_rpc_process_spawn()} needs to be explicitly user-created is also rooted in the fact that we don't have an abstraction over sending arbitrary packed requests/responses. Here, we didn't push the Protobuf solution to its full potential so there's still quite some boilerplate that needs to be written. It's definitely more expressive, though.
+
+\subsection{Marshalling using structs}
+Our problem with marshalling would actually never exist if we just had to support types with memory requirements known at compilation time like ints. We would just create a struct containing the request parameters, interpret it as bytes, send the bytes over, and interpret the bytes on the other side as the struct again. However, this solution breaks with types like strings or more generally arrays which might have unknown memory requirements at compilation time.
+
+\begin{minted}{c}
+struct ProcessSpawnRequest {
+    coreid_t coreid;
+    char *cmdline;
+};
+\end{minted}
+
+The example above illustrates this issue. The \mintinline{c}{char *cmdline} is just a pointer instead of actual bytes of the string inside of the \mintinline{c}{struct ProcessSpawnRequest}.
+
+\section{Protobufs}
+Instead of discussing more marshalling ideas we had we'll just jump to the conclusion: we couldn't come up with a simple enough design which would not require substantial amount of work. And a lot of work also means a lot of potential sources of bugs. Therefore, we incorporated an existing solution. Time-wise this is also a lot of work, but in the end less of our code and more of "battle-tested" code so more likely to JustWork\texttrademark.
+
+Protocol buffers\footnote{https://developers.google.com/protocol-buffers/docs/proto3}, or Protobufs, is a language introduced by Google for serializing structured data. The user defines messages, services, and RPCs in a .proto file. For example:
+\begin{minted}{proto}
+// rpcs.proto
+message ProcessSpawnRequest {
+  uint32 core = 1;
+  string cmdline = 2;
+}
+
+message ProcessSpawnResponse {
+  uint32 pid = 1;
+}
+
+service ProcessService {
+    rpc Spawn(ProcessSpawnRequest) returns (ProcessSpawnResponse);
+}
+\end{minted}
+
+Using a library like \mintinline{c}{protobuf-c}\footnote{https://github.com/protobuf-c/protobuf-c}, hooks in C language for serializing/deserializing of the messages can be generated. Ideally, hooks for the services and the RPCs within it are generated as well. Then we would for example want the client interface to look as follows:
+\begin{minted}{c}
+#include <rpc_generated.h>
+
+errval_t aos_rpc_process_spawn(char *cmdline, coreid_t core, domainid_t *newdid) {
+    // Connect to the Process service.
+    ProcessService ps;
+    nameservice_lookup("process_service", (ServiceBase *)&ps);
+    
+    // Call the Spawn RPC.
+    // Caller is responsible for cleaning up the request and response memory.
+    ProcessSpawnRequest req = {
+        .core = core,
+        .cmdline = cmdline,
+    };
+    ProcessSpawnResponse res;
+    errval_t err = ps->spawn(ps, &req, &res);
+    PUSH_RETURN_IF(err, RPC_ERR_PROCESS_SPAWN);
+    *newpid = res.pid;
+
+    return SYS_ERR_OK;
+}
+\end{minted}
+
+We omit the server interface of this ideal-world interface for brevity. We quickly realized that without modifying the \mintinline{c}{protobuf-c}, there's no way to get an interface this intuitive. Plus we would need to add a new "capability" type to the protos. We swallowed our pride and came up with a compromise described in the next subsection. We still leverage the serialization of Protobufs, but don't autogenerate RPC and service hooks. The serialization generated by \mintinline{c}{protobuf-c} has the following interface (excerpt containing the most interesting functions):
+\begin{minted}{c}
+// Initializes a message.
+void   process_spawn_request__init
+                     (ProcessSpawnRequest         *message);
+// Serializes a message into `out` buffer.
+size_t process_spawn_request__pack
+                     (const ProcessSpawnRequest   *message,
+                      uint8_t             *out);
+// Deserializes a serialized message.
+ProcessSpawnRequest *process_spawn_request__unpack
+                     (ProtobufCAllocator  *allocator,
+                      size_t               len,
+                      const uint8_t       *data);
+\end{minted}
+
+\subsection{The integration}
+Here is the final interface we use that did not require changes in the \mintinline{c}{protobuf-c} autogeneration:
+\begin{minted}{proto}
+enum RpcMethod {
+  PROCESS_SPAWN = 0;
+  
+  // DO NOT CHANGE: Setting up LMP channels depends on this value being 9.
+  SEND_LOCAL_LMP_EP = 9;
+}
+
+// ProcessSpawnRequest and ProcessSpawnResponse omitted.
+
+message RpcRequestWrap {
+  oneof data {
+    ProcessSpawnRequest process_spawn = 2;
+  }
+}
+
+message RpcResponseWrap {
+  uint64 err = 1;
+
+  oneof data {
+    ProcessSpawnResponse process_spawn = 2;
+  }
+}
+
+message RpcMessage {
+  RpcMethod method = 1;
+
+  oneof direction {
+    RpcRequestWrap request = 2;
+    RpcResponseWrap response = 3;
+  }
+}
+\end{minted}
+
+"On the wire" we always send around the \mintinline{c}{RpcMessage} so that we always know which message type to deserialize the received bytes into. The \mintinline{c}{RpcRequestWrap} and \mintinline{c}{RpcResponseWrap} are used on the client-side as follows:
+\begin{minted}{c}
+// Calls an RPC `method` with `request` payload and `request_cap` capability. Receives the
+// response payload in callee-allocated `response` and response capability in `response_cap`.
+// In case of an error (remote or local), returns the corresponding error code.
+errval_t aos_rpc_call(struct aos_rpc *rpc, RpcMethod method, RpcRequestWrap *request,
+                      struct capref request_cap, RpcResponseWrap **response,
+                      struct capref *response_cap);
+
+errval_t aos_rpc_process_spawn(struct aos_rpc *rpc, char *cmdline, coreid_t core,
+                               domainid_t *newpid) {
+    ProcessSpawnRequest req = PROCESS_SPAWN_REQUEST__INIT;
+    req.core = core;
+    req.cmdline = cmdline;
+    // A macro that creates RpcRequestWrap with the `req`. The lowercase "init_process_spawn"
+    // and uppercase "INIT_PROCESS_SPAWN" are needed for the field names in the macro.
+    REQUEST_WRAP(req_wrap, init_process_spawn, INIT_PROCESS_SPAWN, &req);
+    
+    RpcResponseWrap *res_wrap = NULL;
+    aos_rpc_call(rpc, RPC_METHOD__PROCESS_SPAWN, &req_wrap, NULL_CAP,
+                       &res_wrap, NULL);
+    
+    *newpid = res_wrap->process_spawn->pid;
+    // Destroy the callee-allocated response payload.
+    RESPONSE_WRAP_DESTROY(res_wrap);
+
+    return SYS_ERR_OK;
+}
+\end{minted}
+
+The interface is far from the ideal shown before, but it's okay to justify the fact that now we can send requests and responses containing almost arbitrary data (ints, strings, arrays, nested proto messages, arrays of nested proto messages, you name it!).
+
+Under the hood, the \mintinline{c}{aos_rpc_call()} puts the \mintinline{c}{request} into \mintinline{c}{RpcMessage} with the corresponding \mintinline{c}{method} and sends this serialized to the other endpoint. Then it receives a response \mintinline{c}{RpcMessage}, deserializes it and takes out the \mintinline{c}{RpcResponseWrap} to return it to the sender. 
+
+What remains is to discuss how this is handled on the server side. There's not much magic to it -- the global handler registered with the waitset takes out the \mintinline{c}{RpcRequestWrap} from the received \mintinline{c}{RpcMessage}, preallocates a response and calls the user-provided handler. The handler fills the response which is then put into \mintinline{c}{RpcMessage} and send to the caller.
+
+\section{Benchmarks}
+When running our RPC benchmarks over both UMP and LMP we observed that every RPC took roughly 80ms. That's basically an eternity because we were expecting a single call to be in the order of microseconds. This was the case even for the smallest messages of sizes 16B. At first, we thought the Protobuf serialization is slow, but when microbenchmarking it separately it ran in microseconds.
+
+Then we looked closely at the UMP case. We found out that time between a message being added to the buffer and the time when the domain receiving the buffer was scheduled, was almost 80ms. The receiving domain seems to be scheduled very sparsely when using the active polling in the \mintinline{c}{waitset}. Note that  the same issue was observed in the Network implementation and led to a separate active polling thread implementation, see \autoref{net:high_speed}.
+
+One can now wonder why did the issue not appear in the "raw" LMP/UMP benchmark in \autoref{sec:ump_bench}. Therefore, we went back to these benchmarks and tried to make them a little slower "simulating" what happens in the RPC case. Our suspicion was that the issue has to do with scheduling. And in line with this believe is that when adding a \mintinline{c}{barrelfish_usleep(400)} right before sending the data over for the "raw" LMP/UMP, the RTT takes 80ms (as opposed to an expectation of say at most 10ms) given that the sleep function has takes microseconds as argument. 
+
+Since this slowdown affects every individual project, we put serious effort into finding the root cause, but unsuccessfully. Our suspicion is that it's an issue in the scheduler.
+
+\subsection{Elimination of memory copies}
+\label{sec:rpc_proto_opt}
+The Protobuf layer currently incurs two memory copies when receiving: one to receive data from the underlying channel (LMP/UMP) and another to deserialize the data. Analogously for sending.
+
+This can be brought down to just a single memory copy -- when copying data to and from the underlying channel. The \mintinline{c}{Protobuf-c} has support for this, but since our bottleneck ended up being the 80ms bug, we didn't implement this optimization. 
+
+\begin{hindsight}
+Overall, we think it was a good idea to overengineer the RPCs a little. The API turned out okayish, causing occasional headaches, but concise enough for most cases. Compared to the initial design which required writing glue code ourselves, we went from trusting some ("battletest") glue codes to trusting all of them because they were generated. 
+
+The biggest takeaway though is to benchmark early. We only discovered the 80ms bug three days before the deadline. And sadly, we were not able to identify the root cause in time despite putting in decent hours.
+\end{hindsight}
