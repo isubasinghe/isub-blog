@@ -52,7 +52,7 @@ Like any opinion, they are almost certainly not universally applicable.
 
 ## Key Ideas
  * Be careful about theory combination.
- * Avoid non-linear arithemtic.
+ * Avoid non-linear arithmetic.
  * Be careful with BitVectors.
  * Handle quantifiers with care.
  * Keep your encoding simple and precise.
