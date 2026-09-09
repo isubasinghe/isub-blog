@@ -1,0 +1,140 @@
+<!DOCTYPE html><html lang="en" data-astro-cid-37fxchfa> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" type="image/x-icon" href="/favicon.ico"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css" crossorigin="anonymous"><title>Building efficient verifiers</title><meta name="description" content="How to efficiently encode program logic into SMT"><style>:root{font-family:Verdana,sans-serif;font-size:16px}a{color:#1768ac;font-size:inherit}.mspace.newline{margin-top:1.5rem}.wiki-link.broken{color:#b00020;text-decoration:underline dotted #b00020;cursor:help}.wiki-breadcrumbs{font-size:.95rem;margin-bottom:1rem;color:#555}.wiki-breadcrumbs a{font-size:.95rem}.wiki-children,.wiki-siblings,.wiki-backlinks{margin-top:2.5rem;border-top:1px solid #ddd;padding-top:1rem}.wiki-children h2,.wiki-siblings h2,.wiki-backlinks h2{font-size:1rem;color:#666;margin-bottom:.5rem;font-weight:400;text-transform:uppercase;letter-spacing:.05em}#wiki-graph{width:100%;height:70vh;border:1px solid #ddd;border-radius:4px}.container[data-astro-cid-37fxchfa]{max-width:56rem;margin:0 auto;margin-top:2rem;padding:0 1.5rem}
+a[data-astro-cid-g5kbnxd7]{text-decoration:none}
+.date[data-astro-cid-7jjqptxk]{margin-top:20px;text-decoration:underline;display:flex;justify-content:flex-end}
+</style><script type="module" src="/_astro/page.DGRhADao.js"></script></head> <body data-astro-cid-37fxchfa> <div class="container" data-astro-cid-37fxchfa>  <a href="/blog" data-astro-cid-g5kbnxd7>&lt;</a>  <div class="date" data-astro-cid-7jjqptxk>Published Date: 2026-9-9</div><h2 id="how-to-efficiently-encode-program-logic-into-smt">How to efficiently encode program logic into SMT</h2>
+<p>This is a bloggified version of my last Monday talk at <a href="https://trustworthy.systems/">Trustworthy Systems</a>.</p>
+<p>What is a <code>Monday talk</code> you might ask, well Gernot cares deeply about building the skills of his students and employees,
+this doesn’t extend to just technical skills but also soft skills.</p>
+<p>These Monday talks are a way to increase the ability of technical nerds like to me to present to a competent but general computer science
+educated public. This is what one would do if they were representing a seL4 project at a conference, so it has more uses than just
+personal development.</p>
+<h2 id="a-bit-about-me">A bit about me</h2>
+<p>I worked on <a href="https://github.com/verus-lang/verus">Verus</a> and then later on, I worked on <a href="https://github.com/au-ts/gordian">Gordian</a>.
+During both projects, I gained some insight on how to best encode program logic in a way that was more easily dealt by a SMT solver.
+Some of this insight was gained through mistakes we made during the development of Gordian and through the experiences using <a href="https://dafny.org/">Dafny</a>.</p>
+<h2 id="what-are-smt-solvers">What are SMT solvers?</h2>
+<p>SMT solvers are fundementally just a set of “theories” implemented on top of a SAT solver to offer automation
+of more expressive formulas than just boolean logic.</p>
+<p>These formulas are represented in first order logic, you can obviously restrict yourself to just propositional logic (more on that later).
+But SMT solvers are interesting because they have use in formal verification, program synthesis, optimisation problems and more.</p>
+<h2 id="why-is-thought-about-encoding-important">Why is thought about encoding important?</h2>
+<p>When you initially approach the problem of encoding program logic in SMT, you maybe tempted to reach for the hammer
+and brute force yourself a solution that at least looks correct logically, the issue you will run into may not be
+“Is my encoding correct?” first but rather “Why is my program verification so damn slow?”</p>
+<p>The unfortunate truth is that designing SMT frontends is more of an art than a science.
+Performance is dependent on many variables such as:</p>
+<ul>
+<li>The solver in use (Z3, CVC5, YICES and many many more).</li>
+<li>Solver version (yes going from 4.0.3 to 4.0.4 may render your proof unworkable to the solver).</li>
+<li>Hardware</li>
+<li>Theories used</li>
+</ul>
+<p>The sad part is that in order for you to truly understand the best encoding, you must understand the solver you are targetting.
+When I worked on Verus, we explictly targetted Z3, when I worked on Gordian we had much better performance using CVC5 if I remember correctly.</p>
+<p>In my opinion, I would say the landscape demonstrated a high degree of correlation between successful tools and
+relationships with Microsoft/Z3.</p>
+<h2 id="warning">Warning</h2>
+<p>These are at the end of the day, my person experiences working with Z3.
+Like any opinion, they are almost certainly not universally applicable.</p>
+<h2 id="key-ideas">Key Ideas</h2>
+<ul>
+<li>Be careful about theory combination.</li>
+<li>Avoid non-linear arithemtic.</li>
+<li>Be careful with BitVectors.</li>
+<li>Handle quantifiers with care.</li>
+<li>Keep your encoding simple and precise.</li>
+<li>When in doubt, look at what others have done.</li>
+</ul>
+<h2 id="what-impacts-smt-performance">What impacts SMT performance?</h2>
+<h3 id="theory-combination">Theory combination</h3>
+<p>As I previously briefly mentioned, an SMT solver allows for a set of theories that sit on top of the foundational SAT layer,
+these theories may be for example: integers, arrays, bitvectos, quantifiers and more.</p>
+<p>The issue here is that theory combination is not some graceful process that takes deep care on how each theory is implemented.
+These solvers rely upon abstract methods/frameworks to perform theory combination, including relying upon the underlying SAT engine
+to infer information about theory combination.</p>
+<p>If we go back to what I stated previously that we should keep the underlying formulas simple and <strong>precise</strong>, I hope you can see
+how this theory combination violates that principle.</p>
+<p>This is infact a key reason why to the two theories of BitVectors and Arrays perform so differently on solvers.</p>
+<h3 id="non-linear-arithmetic">Non-linear arithmetic</h3>
+<p>This is a source of incompleteness (if you remember <a href="https://www.youtube.com/watch?v=O4ndIDcDSGc">Godel’s incompleteness theorem</a>,
+this is due to the fact that the decision procedure for NLA on integers is undecidable.
+As I mentioned before, theory combination plays a particularly nasty part here, making debugging much much harder.</p>
+<p>The reason that this theory is costly is because SMT solvers typically tend to have decision procedures that
+attempt to solve these theories through brute force. An example is a technique known as bit blasting,
+this if not bounded somehow via assertions can result in the solver attempting to search the entire (infinite) search space.</p>
+<p>As mentioned before, one technique that may help you when you encounter NLA is to throw known bounds into your the domain of your integers.</p>
+<p>For example, if the program guarantees that <code>x</code> and <code>y</code> are between 0 and 100, include those bounds in SMT-LIB:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>(set-logic QF_NIA)</span></span>
+<span class="line"><span>(declare-const x Int)</span></span>
+<span class="line"><span>(declare-const y Int)</span></span>
+<span class="line"><span>(assert (= (* x y) 42)) ; Multiplying two variables is non-linear.</span></span>
+<span class="line"><span>(assert (and (&#x3C;= 0 x) (&#x3C;= x 100) (&#x3C;= 0 y) (&#x3C;= y 100)))</span></span>
+<span class="line"><span>(check-sat) ; sat</span></span></code></pre>
+<h3 id="bitvectors">BitVectors</h3>
+<p>The theory of BitVectors are sometimes used to represent finite domain integers that lie upon a contiguous space,
+conceptually you can think of BitVectos in the same way that you think about n-bit words on a computer.</p>
+<p>The issue with BitVectors is that Z3 handles the translation from BV to SAT through bit blasting, an incredibly expensive
+process since it turns a n-bit word to n booleans.</p>
+<p>So you might think that it may be the case that you should avoid BitVectors altogether, but this is not the case!
+The reason is because certain operations such as all the bitwise operators, division and modulo are only available to BV.
+How do we get the advantages of integer theory but still encode bitwise operators?
+The solution is simple and that is to use the two theories in unison.</p>
+<p>We can achieve this through the use of uninterpreted functions in SMT theory.
+These are functions that are as the name suggests, uninterpreted and have no body, you can only derive facts from them.
+This is best demonstrated through an example.</p>
+<p>Say we want to prove that <code>1 | 0 == 1</code> for 32-bit integers. We can prove this in BV land,
+then use what we learnt as a fact about our uninterpreted function in integer land:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>(declare-fun bitwise-or (Int Int) Int)</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>; Prove the bitwise fact by checking its negation.</span></span>
+<span class="line"><span>(push 1)</span></span>
+<span class="line"><span>(define-fun a () (_ BitVec 32) (_ bv1 32))</span></span>
+<span class="line"><span>(define-fun b () (_ BitVec 32) (_ bv0 32))</span></span>
+<span class="line"><span>(assert (not (= (bvor a b) (_ bv1 32))))</span></span>
+<span class="line"><span>(check-sat) ; unsat: the bitwise fact holds.</span></span>
+<span class="line"><span>(pop 1)</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>; After the proof succeeds, the frontend adds the fact in integer land.</span></span>
+<span class="line"><span>(assert (= (bitwise-or 1 0) 1))</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>; Use that fact in an integer arithmetic proof.</span></span>
+<span class="line"><span>(push 1)</span></span>
+<span class="line"><span>(assert (not (= (+ (bitwise-or 1 0) 1) 2)))</span></span>
+<span class="line"><span>(check-sat) ; unsat</span></span>
+<span class="line"><span>(pop 1)</span></span></code></pre>
+<p>Once Z3 gives us <code>unsat</code> for the first query, our frontend can add the fact about <code>bitwise-or</code> to the integer proof.
+We have done the bitwise work in BV land, so the rest of the proof can just use what we learnt.</p>
+<p>Here we are using <code>bitwise-or</code> to stand for unsigned 32-bit OR. If we needed any assumptions to prove the BV part,
+we would also need those assumptions in integer land when we use the result.</p>
+<p>One thing that a keen reader might wonder would be how commutativty works when you write these bitvector lemmas,
+the answer is simple, it doesn’t!
+This technique as shown here is obviously restrictive but in practice it works well enough for most programs.
+At the end of the day, choosing your encoding is really all just a matter of how to encode in such a way that it is general enough
+while being performant.</p>
+<p>This however does put “creative burden” on the proof engineer, typically something only interactive theorem provers do.</p>
+<h3 id="quantifiers">Quantifiers</h3>
+<p>Quantifiers are helpful and <strong>needed</strong> to express most non-trivial proofs, especially over an infinite domain for example.
+But this is also a great way to introduce incompleteness.</p>
+<p>Quantifier instantiation is done via syntactic pattern matching, this means if the solver or the proof engineer
+chooses a bad trigger, it may not instantiate at all or worse could trigger other quanitfiers in a loop.</p>
+<p>Even when the underlying quantified problem is decidable, a poor choice of triggers can prevent the solver from finding the proof.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="rust"><code><span class="line"><span style="color:#E1E4E8">proof </span><span style="color:#F97583">fn</span><span style="color:#B392F0"> trigger_forever</span><span style="color:#E1E4E8">()</span></span>
+<span class="line"><span style="color:#E1E4E8">    requires</span></span>
+<span class="line"><span style="color:#E1E4E8">        forall</span><span style="color:#F97583">|</span><span style="color:#E1E4E8">x</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> nat, y</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> nat</span><span style="color:#F97583">|</span><span style="color:#B392F0"> f</span><span style="color:#E1E4E8">(x </span><span style="color:#F97583">+</span><span style="color:#79B8FF"> 1</span><span style="color:#E1E4E8">, </span><span style="color:#79B8FF">2</span><span style="color:#F97583"> *</span><span style="color:#E1E4E8"> y)</span></span>
+<span class="line"><span style="color:#F97583">            &#x26;&#x26;</span><span style="color:#B392F0"> f</span><span style="color:#E1E4E8">(</span><span style="color:#79B8FF">2</span><span style="color:#F97583"> *</span><span style="color:#E1E4E8"> x, y </span><span style="color:#F97583">+</span><span style="color:#E1E4E8"> x) </span><span style="color:#F97583">||</span><span style="color:#B392F0"> f</span><span style="color:#E1E4E8">(y, x)</span></span>
+<span class="line"><span style="color:#F97583">                ==></span><span style="color:#E1E4E8"> #[trigger] </span><span style="color:#B392F0">f</span><span style="color:#E1E4E8">(x, y),</span></span>
+<span class="line"><span style="color:#E1E4E8">    ensures</span></span>
+<span class="line"><span style="color:#E1E4E8">        forall</span><span style="color:#F97583">|</span><span style="color:#E1E4E8">x</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> nat, y</span><span style="color:#F97583">:</span><span style="color:#E1E4E8"> nat</span><span style="color:#F97583">|</span><span style="color:#E1E4E8"> x </span><span style="color:#F97583">></span><span style="color:#79B8FF"> 2318</span><span style="color:#F97583"> &#x26;&#x26;</span><span style="color:#E1E4E8"> y </span><span style="color:#F97583">&#x3C;</span><span style="color:#79B8FF"> 100</span></span>
+<span class="line"><span style="color:#F97583">            ==></span><span style="color:#B392F0"> f</span><span style="color:#E1E4E8">(x, y),</span></span>
+<span class="line"><span style="color:#E1E4E8">{</span></span>
+<span class="line"><span style="color:#E1E4E8">}</span></span></code></pre>
+<p>Nothing will prevent you from shooting yourself in the foot here, but we can at least avoid having to manually specify most triggers.
+My advice is to <strong>always</strong> require triggers at the most abstract level of your specification. Your frontend should infer them
+at the highest level of abstraction it can, while it still has the structure of the specification to work with.</p>
+<p>SMT solvers can infer triggers, but by that point they are working with the lower level encoding of your program.
+As I mentioned before, we want to keep our encoding <strong>precise</strong>, and making these decisions after we have lost that higher level structure
+works against that. Choosing triggers earlier gives us more control over when we want our quantifiers to instantiate.</p>
+<p>You should also provide profiling tooling that can analyse SMT logs and help debug these “matching loops”.
+When a proof starts triggering quantifiers in a loop, the proof engineer needs a way to see which instantiations are causing it
+and which triggers to look at.
+Use this <a href="https://github.com/isubasinghe/smt-profiler">tool</a> I ripped off Verus.</p>  </div> <script async defer src="https://scripts.simpleanalyticscdn.com/latest.js"></script> </body> </html>   

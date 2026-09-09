@@ -5,7 +5,7 @@
 
 a {
   color: #1768ac;
-  font-size: 1.25rem;
+  font-size: inherit;
 }
 
 .mspace.newline {
