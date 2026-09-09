@@ -1,0 +1,207 @@
+---
+import type { WikiTreeNode } from '../../lib/wiki/tree';
+
+interface Props {
+  nodes: WikiTreeNode[];
+  depth?: number;
+  currentUrl?: string;
+}
+
+const { nodes, depth = 0, currentUrl } = Astro.props;
+---
+
+<ul class:list={['tree-list', { 'tree-root': depth === 0 }]}>
+  {nodes.map((node) => {
+    const nodePath = `/wiki/${node.id}`;
+    const isCurrent = node.url === currentUrl;
+    const open = currentUrl
+      ? currentUrl === nodePath || currentUrl.startsWith(`${nodePath}/`)
+      : depth === 0;
+    return (
+      <li class="tree-item">
+        {node.children.length > 0 ? (
+          <details open={open}>
+            <summary class:list={['tree-row', { 'is-current': isCurrent }]}>
+              <span class="chevron" aria-hidden="true"></span>
+              <span class="tree-label">
+                {node.url
+                  ? <a href={node.url} aria-current={isCurrent ? 'page' : undefined}>{node.title}</a>
+                  : <span class="folder-label">{node.title}</span>}
+                {node.description && <span class="description">{node.description}</span>}
+              </span>
+              <span class="page-count">
+                {node.descendantCount} {node.descendantCount === 1 ? 'page' : 'pages'}
+              </span>
+            </summary>
+            <Astro.self nodes={node.children} depth={depth + 1} currentUrl={currentUrl} />
+          </details>
+        ) : (
+          <div class:list={['tree-row', 'tree-leaf', { 'is-current': isCurrent }]}>
+            <span class="leaf-mark" aria-hidden="true"></span>
+            <span class="tree-label">
+              <a href={node.url!} aria-current={isCurrent ? 'page' : undefined}>{node.title}</a>
+              {node.description && <span class="description">{node.description}</span>}
+            </span>
+          </div>
+        )}
+      </li>
+    );
+  })}
+</ul>
+
+<style>
+  .tree-list {
+    list-style: none;
+    margin: 0 0 0 1rem;
+    padding: 0 0 0 1.25rem;
+    border-left: 1px solid #ddd;
+  }
+
+  .tree-root {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .tree-item {
+    position: relative;
+    padding: 0;
+  }
+
+  .tree-list:not(.tree-root) > .tree-item::before {
+    content: '';
+    position: absolute;
+    top: 1.25rem;
+    left: -1.25rem;
+    width: 1rem;
+    border-top: 1px solid #ddd;
+  }
+
+  .tree-root > .tree-item + .tree-item {
+    margin-top: 0.4rem;
+  }
+
+  .tree-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-height: 2.5rem;
+    padding: 0.5rem;
+    box-sizing: border-box;
+    border-radius: 3px;
+    line-height: 1.5;
+  }
+
+  summary {
+    cursor: pointer;
+    list-style: none;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .tree-row:hover {
+    background: #f4f7fa;
+  }
+
+  .tree-row.is-current {
+    background: #eaf2f8;
+    box-shadow: inset 2px 0 #1768ac;
+  }
+
+  a[aria-current='page'] {
+    font-weight: bold;
+  }
+
+  summary:focus-visible,
+  a:focus-visible {
+    outline: 2px solid #1768ac;
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  .chevron,
+  .leaf-mark {
+    flex: 0 0 0.75rem;
+    width: 0.75rem;
+    align-self: flex-start;
+    margin-top: 0.35rem;
+    height: 0.75rem;
+    display: grid;
+    place-items: center;
+    color: #666;
+  }
+
+  .chevron::before {
+    content: '';
+    width: 0.35rem;
+    height: 0.35rem;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg);
+  }
+
+  details[open] > summary .chevron::before {
+    transform: translateY(-0.1rem) rotate(45deg);
+  }
+
+  .leaf-mark::before {
+    content: '';
+    width: 0.2rem;
+    height: 0.2rem;
+    border-radius: 50%;
+    background: #999;
+  }
+
+  .tree-label {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  a,
+  .folder-label {
+    font-size: 1rem;
+  }
+
+  .tree-root > .tree-item > details > summary .tree-label {
+    font-weight: bold;
+  }
+
+  .description {
+    display: block;
+    color: #666;
+    font-size: 0.875rem;
+    font-weight: normal;
+  }
+
+  .page-count {
+    flex-shrink: 0;
+    color: #666;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 40rem) {
+    .tree-list {
+      margin-left: 0.75rem;
+      padding-left: 0.65rem;
+    }
+
+    .tree-root {
+      margin-left: 0;
+      padding-left: 0;
+    }
+
+    .tree-list:not(.tree-root) > .tree-item::before {
+      left: -0.65rem;
+      width: 0.5rem;
+    }
+
+    .tree-row {
+      min-height: 2.75rem;
+      gap: 0.4rem;
+      padding: 0.5rem 0.25rem;
+    }
+  }
+</style>

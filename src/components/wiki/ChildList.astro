@@ -1,44 +1,95 @@
 ---
 import type { CollectionEntry } from 'astro:content';
-import { childrenOf } from '../../lib/wiki/paths';
-import { entryToUrl, displayTitle } from '../../lib/wiki/graph';
+import { buildPageTree } from '../../lib/wiki/tree';
+import { entryToUrl } from '../../lib/wiki/graph';
+import PageTree from './PageTree.astro';
 
 interface Props {
   /** Parent folder id, e.g. "concurrency" or "index"/"README" for the root. */
   parentId: string;
   entries: CollectionEntry<'wiki'>[];
+  currentId?: string;
 }
 
-const { parentId, entries } = Astro.props;
-const children = childrenOf(parentId, entries).sort((a, b) =>
-  displayTitle(a).localeCompare(displayTitle(b))
-);
+const { parentId, entries, currentId } = Astro.props;
+const nodes = buildPageTree(parentId, entries);
+const hasBranches = nodes.some((node) => node.children.length > 0);
+const currentUrl = currentId ? entryToUrl(currentId) : undefined;
 ---
 
-{children.length > 0 && (
+{nodes.length > 0 && (
   <section class="wiki-children">
-    <h2>Pages</h2>
-    <ul>
-      {children.map((c) => (
-        <li>
-          <a href={entryToUrl(c.id)}>{displayTitle(c)}</a>
-          {c.data.description && <span class="desc"> — {c.data.description}</span>}
-        </li>
-      ))}
-    </ul>
+    <div class="tree-heading">
+      <h2>Browse pages</h2>
+      {hasBranches && (
+        <div class="tree-controls" hidden>
+          <button type="button" data-tree-action="expand">Expand all</button>
+          <button type="button" data-tree-action="collapse">Collapse all</button>
+        </div>
+      )}
+    </div>
+    {hasBranches && <p class="tree-hint">Use the arrows to explore topics, or a page title to read it.</p>}
+    <nav aria-label="Wiki pages">
+      <PageTree nodes={nodes} currentUrl={currentUrl} />
+    </nav>
   </section>
 )}
 
+<script>
+  document.querySelectorAll<HTMLElement>('.wiki-children').forEach((section) => {
+    const controls = section.querySelector<HTMLElement>('.tree-controls');
+    if (!controls) return;
+    controls.hidden = false;
+    controls.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+      button.addEventListener('click', () => {
+        const open = button.dataset.treeAction === 'expand';
+        section.querySelectorAll('details').forEach((branch) => {
+          branch.open = open;
+        });
+      });
+    });
+  });
+</script>
+
 <style>
-  ul {
-    list-style: none;
-    padding: 0;
+  .tree-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
   }
-  li {
-    padding: 0.35rem 0;
+
+  .tree-heading h2 {
+    margin: 0;
   }
-  .desc {
+
+  .tree-controls:not([hidden]) {
+    display: flex;
+    gap: 1rem;
+  }
+
+  button {
+    padding: 0.5rem 0;
+    border: 0;
+    background: none;
+    color: #1768ac;
+    font: inherit;
+    font-size: 0.875rem;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    cursor: pointer;
+  }
+
+  button:focus-visible {
+    outline: 2px solid #1768ac;
+    outline-offset: 3px;
+  }
+
+  .tree-hint {
+    margin: 0.5rem 0 1rem;
     color: #666;
-    font-size: 0.95rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
   }
 </style>

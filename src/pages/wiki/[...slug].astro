@@ -2,7 +2,6 @@
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Breadcrumbs from '../../components/wiki/Breadcrumbs.astro';
-import SiblingList from '../../components/wiki/SiblingList.astro';
 import ChildList from '../../components/wiki/ChildList.astro';
 import Backlinks from '../../components/wiki/Backlinks.astro';
 import {
@@ -11,7 +10,6 @@ import {
   entryToUrl,
   displayTitle,
 } from '../../lib/wiki/graph';
-import { folderIdOf, isFolderIndex } from '../../lib/wiki/paths';
 
 export async function getStaticPaths() {
   const entries = await getCollection('wiki');
@@ -39,15 +37,12 @@ const { entry, allEntries, backlinks } = Astro.props;
 const { Content } = await render(entry);
 const title = displayTitle(entry);
 const description = entry.data.description || `Isitha's wiki — ${title}`;
-const folderId = folderIdOf(entry.id);
-const showChildren = isFolderIndex(entry.id);
 ---
 
 <BaseLayout title={title} description={description}>
   <Breadcrumbs id={entry.id} entries={allEntries} />
   <h1>{title}</h1>
   <Content />
-  {showChildren && <ChildList parentId={folderId} entries={allEntries} />}
-  <SiblingList id={entry.id} entries={allEntries} />
+  <ChildList parentId="index" entries={allEntries} currentId={entry.id} />
   <Backlinks entries={backlinks} />
 </BaseLayout>
