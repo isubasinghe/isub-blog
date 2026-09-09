@@ -104,6 +104,10 @@ process since it turns a n-bit word to n booleans.
 
 So you might think that it may be the case that you should avoid BitVectors altogether, but this is not the case!
 The reason is because BV gives us the bitwise operators.
+
+If you want to stick to linear integers (`QF_LIA`), you do not have `div` and `mod` available to you.
+NLA will provide you these functions with all the performance problems that they may bring coming along the ride as well.
+
 How do we get the advantages of integer theory but still encode bitwise operators?
 The solution is simple and that is to use the two theories in unison.
 
