@@ -103,7 +103,7 @@ The issue with BitVectors is that Z3 handles the translation from BV to SAT thro
 process since it turns a n-bit word to n booleans. 
 
 So you might think that it may be the case that you should avoid BitVectors altogether, but this is not the case!
-The reason is because certain operations such as all the bitwise operators, division and modulo are only available to BV.
+The reason is because BV gives us the bitwise operators.
 How do we get the advantages of integer theory but still encode bitwise operators?
 The solution is simple and that is to use the two theories in unison.
 
